@@ -9,9 +9,9 @@
   html, body, #root { width: 100%; height: 100dvh; overflow: hidden; }
   body { background: #0a0a1a; }
 </style>
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js"></script>
 </head>
 <body>
 <div id="root"></div>
@@ -49,7 +49,7 @@ function Frac(props) {
 /* ---- Config ---- */
 var DIFFICULTIES = {
   easy:   { label: "\u304b\u3093\u305f\u3093", emoji: "\ud83c\udf31", cardCount: 6,  ds: [2, 3, 4, 6], splits: 2, color: "#4ECDC4", desc: "6\u679a\u30fb\u304b\u3093\u305f\u3093\u306a\u5206\u6bcd", bonus: 0.7 },
-  normal: { label: "\u3075\u3064\u3046", emoji: "\u26a1", cardCount: 15, ds: [2, 3, 4, 5, 6, 8, 10, 12], splits: 3, color: "#FFEAA7", desc: "15\u679a\u30fb\u5206\u6bcd12\u307e\u3067", bonus: 1.0 },
+  normal: { label: "\u3075\u3064\u3046", emoji: "\u26a1", cardCount: 10, ds: [2, 3, 4, 5, 6, 8, 10, 12], splits: 3, color: "#FFEAA7", desc: "10\u679a\u30fb\u5206\u6bcd12\u307e\u3067", bonus: 1.0 },
   hard:   { label: "\u3080\u305a\u304b\u3057\u3044", emoji: "\ud83d\udd25", cardCount: 15, ds: [2, 3, 4, 5, 6, 8, 10, 12], splits: 4, color: "#FF6B6B", desc: "15\u679a\u30fb\u5927\u304d\u306a\u5206\u6bcd\u3082", bonus: 1.5 },
 };
 var SP_NUMS = [2, 3, 5, 7];
@@ -118,6 +118,46 @@ function getRank(t) {
   return { l: "\u306f\u3058\u3081\u306e\u4e00\u6b69", e: "\ud83c\udf31", c: "#96CEB4" };
 }
 
+/* ---- ALT: star rating & reward ---- */
+function getStars(sc) {
+  if (sc.perf) return 3;
+  if (sc.total >= 3000) return 2;
+  return 1;
+}
+function clearAlt(stars) { return stars === 3 ? 10 : stars === 2 ? 6 : 3; }
+var FIRST_CLEAR_BONUS = 5;
+var MAX_SCORE = 12000;
+var DIFF_KEYS = ["easy", "normal", "hard"];
+
+/* ---- Ranking helpers ---- */
+function getNextMonday4am() {
+  var now = new Date();
+  var jst = new Date(now.getTime() + 9 * 3600000);
+  var day = jst.getUTCDay();
+  var diff = ((8 - day) % 7) || 7;
+  var next = new Date(jst);
+  next.setUTCDate(next.getUTCDate() + diff);
+  next.setUTCHours(4, 0, 0, 0);
+  return next.getTime() - 9 * 3600000;
+}
+function isWeeklyExpired(resetTime) { return Date.now() >= resetTime; }
+function insertRanking(list, entry, max) {
+  var arr = (list || []).slice();
+  arr.push(entry);
+  arr.sort(function(a, b) { return b.score - a.score || a.time - b.time; });
+  return arr.slice(0, max);
+}
+function findMyRank(list, name, score, time) {
+  for (var i = 0; i < (list || []).length; i++) {
+    if (list[i].name === name && list[i].score === score && list[i].time === time) return i + 1;
+  }
+  return -1;
+}
+var ST = {
+  get: function(k, shared) { try { return window.storage.get(k, shared); } catch(e) { return Promise.resolve(null); } },
+  set: function(k, v, shared) { try { return window.storage.set(k, v, shared); } catch(e) { return Promise.resolve(null); } },
+};
+
 var CSS = [
   "@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap');",
   "@keyframes fadeIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}",
@@ -128,10 +168,14 @@ var CSS = [
   "@keyframes cu1Pulse{0%,100%{box-shadow:0 0 10px rgba(255,165,0,.3),inset 0 0 6px rgba(255,165,0,.08)}50%{box-shadow:0 0 24px rgba(255,165,0,.6),inset 0 0 10px rgba(255,165,0,.12)}}",
   "@keyframes cardAppear{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}",
   "@keyframes deliverBounce{0%{transform:scale(.5);opacity:0}50%{transform:scale(1.2)}100%{transform:scale(1);opacity:1}}",
-  "@keyframes perfectBurst{0%{transform:scale(.3);opacity:0}50%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}",
-  "@keyframes shimmer{0%{background-position:-200% center}100%{background-position:200% center}}",
   "@keyframes formulaIn{from{opacity:0;transform:scale(.8) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}",
   "@keyframes answerReveal{from{opacity:0;transform:scale(1.3)}to{opacity:1;transform:scale(1)}}",
+  "@keyframes altDon{0%{opacity:0;transform:scale(.3)}40%{opacity:1;transform:scale(1.15)}60%{transform:scale(.95)}100%{opacity:1;transform:scale(1)}}",
+  "@keyframes simpFlash{0%{filter:brightness(1)}30%{filter:brightness(2.5)}100%{filter:brightness(1)}}",
+  "@keyframes simpText{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-40px)}}",
+  "@keyframes rankIn{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}",
+  "@media(min-width:600px){.ff-home{max-width:500px!important}.ff-game{max-width:700px!important;margin:0 auto!important}.ff-header{height:44px!important;font-size:16px!important;padding:0 14px!important}.ff-cards{top:44px!important;left:12px!important;right:12px!important;gap:8px!important}.ff-bottom{height:28dvh!important;padding:10px!important;gap:10px!important}}",
+  "@media(min-width:900px){.ff-home{max-width:540px!important}.ff-game{max-width:800px!important}.ff-header{height:50px!important}.ff-cards{top:50px!important;left:16px!important;right:16px!important;gap:10px!important}.ff-bottom{height:26dvh!important;padding:12px!important}}",
   "*{box-sizing:border-box;}",
   "html,body{overscroll-behavior:none;}"
 ].join("\n");
@@ -147,12 +191,12 @@ function FormulaOverlay(props) {
   var done = useRef(false);
   useEffect(function() {
     var t1, t2;
-    if (needsConvert) { t1 = setTimeout(function() { setPhase(1); }, 400); t2 = setTimeout(function() { setPhase(2); }, 900); }
-    else { t2 = setTimeout(function() { setPhase(2); }, 500); }
+    if (needsConvert) { t1 = setTimeout(function() { setPhase(1); }, 200); t2 = setTimeout(function() { setPhase(2); }, 700); }
+    else { t2 = setTimeout(function() { setPhase(2); }, 300); }
     return function() { clearTimeout(t1); clearTimeout(t2); };
   }, [needsConvert]);
   useEffect(function() {
-    if (phase === 2) { var t = setTimeout(function() { if (!done.current) { done.current = true; onConfirm(result); } }, 600); return function() { clearTimeout(t); }; }
+    if (phase === 2) { var t = setTimeout(function() { if (!done.current) { done.current = true; onConfirm(result); } }, 400); return function() { clearTimeout(t); }; }
   }, [phase]);
   var skip = function() { if (!done.current) { done.current = true; onConfirm(result); } };
   return (
@@ -206,31 +250,155 @@ function SpOpChooser(props) {
   );
 }
 
-/* ---- Result Screen ---- */
+/* ---- Ranking Screen ---- */
+function RankingScreen(props) {
+  var onBack = props.onBack, myName = props.myName;
+  var _tab = useState("weekly"), tab = _tab[0], setTab = _tab[1];
+  var _dTab = useState("normal"), dTab = _dTab[0], setDTab = _dTab[1];
+  var _data = useState(null), data = _data[0], setData = _data[1];
+  var _resetTime = useState(0), resetTime = _resetTime[0], setResetTime = _resetTime[1];
+  var _remain = useState(""), remain = _remain[0], setRemain = _remain[1];
+  useEffect(function() {
+    setData(null);
+    var key = "ranking:" + tab + ":" + dTab;
+    ST.get(key, true).then(function(r) {
+      try { setData(r && r.value ? JSON.parse(r.value) : []); } catch(e) { setData([]); }
+    });
+    if (tab === "weekly") {
+      ST.get("ranking:weekly:reset", true).then(function(r) {
+        if (r && r.value) setResetTime(parseInt(r.value));
+      });
+    }
+  }, [tab, dTab]);
+  useEffect(function() {
+    if (tab !== "weekly" || !resetTime) { setRemain(""); return; }
+    function calc() {
+      var ms = resetTime - Date.now();
+      if (ms <= 0) { setRemain("\u30ea\u30bb\u30c3\u30c8\u6e08\u307f"); return; }
+      var d = Math.floor(ms / 86400000); ms %= 86400000;
+      var h = Math.floor(ms / 3600000); ms %= 3600000;
+      var m = Math.floor(ms / 60000);
+      setRemain(d + "\u65e5" + h + "\u6642\u9593" + m + "\u5206");
+    }
+    calc();
+    var iv = setInterval(calc, 30000);
+    return function() { clearInterval(iv); };
+  }, [tab, resetTime]);
+  var isT = typeof window !== "undefined" && window.innerWidth >= 600;
+  var tabBtn = function(label, val) {
+    var active = tab === val;
+    return <button onClick={function() { setTab(val); }} style={{ flex: 1, padding: "10px 0", borderRadius: 12, border: "none", background: active ? "linear-gradient(135deg,#667eea,#764ba2)" : "rgba(255,255,255,.05)", color: active ? "#fff" : "rgba(255,255,255,.3)", fontFamily: FF, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{label}</button>;
+  };
+  var diffBtn = function(key) {
+    var d = DIFFICULTIES[key]; var active = dTab === key;
+    return <button key={key} onClick={function() { setDTab(key); }} style={{ flex: 1, padding: "6px 0", borderRadius: 8, border: active ? "2px solid " + d.color : "2px solid transparent", background: active ? d.color + "22" : "transparent", color: active ? d.color : "rgba(255,255,255,.3)", fontFamily: FF, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{d.emoji + d.label}</button>;
+  };
+  return (
+    <div style={{ width: "100%", minHeight: "100vh", background: "linear-gradient(150deg,#0a0a1a 0%,#141432 40%,#0d1b2a 100%)", fontFamily: FF, padding: 20, userSelect: "none", overflowY: "auto" }}>
+      <style>{CSS}</style>
+      <div style={{ maxWidth: isT ? 500 : 380, margin: "0 auto" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <button onClick={onBack} style={{ background: "none", border: "none", fontSize: 20, color: "rgba(255,255,255,.4)", cursor: "pointer" }}>{"\u2190"}</button>
+          <span style={{ fontSize: 20, fontWeight: 700, color: "#fff", fontFamily: FF }}>{"\ud83c\udfc6 \u30e9\u30f3\u30ad\u30f3\u30b0"}</span>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>{tabBtn("\ud83d\udcc5 \u9031\u9593", "weekly")}{tabBtn("\u265e \u6c38\u4e45", "alltime")}</div>
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>{DIFF_KEYS.map(diffBtn)}</div>
+        {tab === "weekly" && remain && <div style={{ fontSize: 10, color: "rgba(255,255,255,.25)", textAlign: "center", marginBottom: 10 }}>{"\u30ea\u30bb\u30c3\u30c8\u307e\u3067: " + remain}</div>}
+        {!data && <div style={{ textAlign: "center", color: "rgba(255,255,255,.2)", padding: 40, fontSize: 13 }}>{"\u8aad\u307f\u8fbc\u307f\u4e2d..."}</div>}
+        {data && data.length === 0 && <div style={{ textAlign: "center", color: "rgba(255,255,255,.2)", padding: 40, fontSize: 13 }}>{"\u307e\u3060\u30c7\u30fc\u30bf\u304c\u3042\u308a\u307e\u305b\u3093"}</div>}
+        {data && data.length > 0 && data.map(function(entry, i) {
+          var isMe = entry.name === myName;
+          var medal = i === 0 ? "\ud83e\udd47" : i === 1 ? "\ud83e\udd48" : i === 2 ? "\ud83e\udd49" : "";
+          return (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 12, marginBottom: 6, background: isMe ? "rgba(102,126,234,.15)" : "rgba(255,255,255,.03)", border: isMe ? "1px solid rgba(102,126,234,.3)" : "1px solid rgba(255,255,255,.04)", animation: "rankIn .3s ease-out" }}>
+              <span style={{ fontSize: medal ? 20 : 14, fontWeight: 700, color: "rgba(255,255,255,.4)", width: 30, textAlign: "center", fontFamily: FF }}>{medal || (i + 1)}</span>
+              <span style={{ flex: 1, fontSize: 14, fontWeight: isMe ? 700 : 500, color: isMe ? "#fff" : "rgba(255,255,255,.6)", fontFamily: FF }}>{entry.name}</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: "#FFD700", fontFamily: FF }}>{entry.score}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ---- Result Screen with ALT ---- */
 function ResultScr(props) {
-  var del = props.del, cards = props.cards, onRetry = props.onRetry, diff = props.diff;
+  var del = props.del, cards = props.cards, onRetry = props.onRetry, onHome = props.onHome, diff = props.diff;
+  var earned = props.earned, firstBonus = props.firstBonus, totalAlt = props.totalAlt, stars = props.stars;
+  var onRegister = props.onRegister, regResult = props.regResult, regLoading = props.regLoading, savedName = props.savedName;
   var sc = calcSc(del, cards, diff);
   var rank = getRank(sc.total);
-  var cfg = DIFFICULTIES[diff] || DIFFICULTIES.normal;
-  /* TRAIL連携: postMessageはデプロイ後に有効化 */
+  var starStr = "";
+  for (var i = 0; i < 3; i++) starStr += i < stars ? "\u2605" : "\u2606";
+  var _show = useState(false), showAlt = _show[0], setShowAlt = _show[1];
+  var _showReg = useState(false), showReg = _showReg[0], setShowReg = _showReg[1];
+  var _regName = useState(savedName || ""), regName = _regName[0], setRegName = _regName[1];
+  useEffect(function() {
+    var t = setTimeout(function() { setShowAlt(true); }, 800);
+    return function() { clearTimeout(t); };
+  }, []);
+  var handleReg = function() { if (regName.trim().length > 0) onRegister(regName.trim(), sc.total); };
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 900, background: "rgba(0,0,0,.6)", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 12 }}>
-      <div style={{ background: "linear-gradient(145deg,#1a1a2e,#16213e)", borderRadius: 22, padding: "24px 20px", textAlign: "center", boxShadow: "0 30px 80px rgba(0,0,0,.6)", border: sc.perf ? "2px solid rgba(255,215,0,.3)" : "2px solid rgba(255,255,255,.08)", animation: "fadeIn .5s ease-out", maxWidth: 380, width: "100%" }}>
-        <div style={{ fontSize: 40, marginBottom: 2 }}>{sc.perf ? "\ud83c\udfc6" : rank.e}</div>
-        <div style={{ fontSize: 20, fontWeight: 700, fontFamily: FF, color: sc.perf ? "#FFD700" : rank.c, marginBottom: 8 }}>{sc.perf ? "PERFECT!" : rank.l}</div>
-        <div style={{ fontSize: 32, fontWeight: 700, fontFamily: FF, background: "linear-gradient(135deg,#FFD700,#FFA500)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", marginBottom: 16 }}>{sc.total}</div>
+    <div style={{ position: "fixed", inset: 0, zIndex: 900, background: "rgba(0,0,0,.6)", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 12, overflowY: "auto" }}>
+      <div style={{ background: "linear-gradient(145deg,#1a1a2e,#16213e)", borderRadius: 22, padding: "22px 18px", textAlign: "center", boxShadow: "0 30px 80px rgba(0,0,0,.6)", border: sc.perf ? "2px solid rgba(255,215,0,.3)" : "2px solid rgba(255,255,255,.08)", animation: "fadeIn .5s ease-out", maxWidth: 380, width: "100%" }}>
+        <div style={{ fontSize: 36, marginBottom: 2 }}>{sc.perf ? "\ud83c\udfc6" : rank.e}</div>
+        <div style={{ fontSize: 18, fontWeight: 700, fontFamily: FF, color: sc.perf ? "#FFD700" : rank.c, marginBottom: 4 }}>{sc.perf ? "PERFECT!" : rank.l}</div>
+        <div style={{ fontSize: 24, color: "#FFD700", letterSpacing: 4, marginBottom: 4 }}>{starStr}</div>
+        <div style={{ fontSize: 26, fontWeight: 700, fontFamily: FF, background: "linear-gradient(135deg,#FFD700,#FFA500)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", marginBottom: 6 }}>{sc.total + "\u70b9"}</div>
         {del.length > 0 && (
-          <div style={{ display: "flex", gap: 5, justifyContent: "center", marginBottom: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 3, justifyContent: "center", marginBottom: 6, flexWrap: "wrap" }}>
             {del.map(function(d, i) {
-              return (
-                <div key={i} style={{ width: 36, height: 36, borderRadius: 9, background: "linear-gradient(135deg,#FFD700,#FF8C00)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 3px 10px rgba(255,215,0,.3)" }}>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1a2e", fontFamily: FF }}>1</span>
-                </div>
-              );
+              return <div key={i} style={{ width: 24, height: 24, borderRadius: 5, background: "linear-gradient(135deg,#FFD700,#FF8C00)", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 11, fontWeight: 700, color: "#1a1a2e", fontFamily: FF }}>{d.n || 1}</span></div>;
             })}
           </div>
         )}
-        <button onClick={onRetry} style={{ background: "linear-gradient(135deg,#667eea,#764ba2)", border: "none", borderRadius: 14, padding: "11px 30px", color: "#fff", fontSize: 15, fontWeight: 700, fontFamily: FF, cursor: "pointer" }}>{"\u3082\u3046\u4e00\u5ea6\u6311\u6226 \u21bb"}</button>
+        {showAlt && (
+          <div style={{ background: "rgba(78,205,196,.1)", borderRadius: 14, padding: "12px", marginBottom: 10, animation: "altDon .5s cubic-bezier(.34,1.56,.64,1)" }}>
+            <div style={{ fontSize: 32, fontWeight: 700, color: "#4ECDC4", fontFamily: FF, textShadow: "0 2px 16px rgba(78,205,196,.5)" }}>{"+" + earned + " ALT"}</div>
+            {firstBonus > 0 && <div style={{ marginTop: 4, fontSize: 12, fontWeight: 700, color: "#FFEAA7", fontFamily: FF }}>{"\ud83c\udf89 \u521d\u30af\u30ea\u30a2 +" + firstBonus}</div>}
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,.25)", marginTop: 4 }}>{"\ud83e\ude99 \u5408\u8a08: " + totalAlt + " ALT"}</div>
+          </div>
+        )}
+        {!showAlt && <div style={{ height: 60, marginBottom: 10 }} />}
+        {/* Ranking register */}
+        {!regResult && !showReg && (
+          <button onClick={function() { setShowReg(true); }} style={{ width: "100%", padding: "10px", borderRadius: 12, border: "1px solid rgba(255,215,0,.3)", background: "rgba(255,215,0,.08)", color: "#FFD700", fontFamily: FF, fontSize: 13, fontWeight: 700, cursor: "pointer", marginBottom: 8 }}>{"\ud83c\udfc6 \u30e9\u30f3\u30ad\u30f3\u30b0\u306b\u767b\u9332\u3059\u308b"}</button>
+        )}
+        {!regResult && showReg && (
+          <div style={{ background: "rgba(255,215,0,.06)", borderRadius: 12, padding: "10px", marginBottom: 8, animation: "fadeIn .3s ease-out" }}>
+            <input value={regName} onChange={function(e) { setRegName(e.target.value); }} placeholder={"\u540d\u524d\u3092\u5165\u529b"} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.05)", color: "#fff", fontFamily: FF, fontSize: 14, marginBottom: 8, outline: "none" }} />
+            <button onClick={handleReg} disabled={regName.trim().length === 0 || regLoading} style={{ width: "100%", padding: "10px", borderRadius: 10, border: "none", background: regName.trim().length > 0 ? "linear-gradient(135deg,#FFD700,#FF8C00)" : "rgba(255,255,255,.05)", color: regName.trim().length > 0 ? "#1a1a2e" : "rgba(255,255,255,.2)", fontFamily: FF, fontSize: 14, fontWeight: 700, cursor: regName.trim().length > 0 ? "pointer" : "default" }}>{regLoading ? "\u767b\u9332\u4e2d..." : "\u767b\u9332\uff01"}</button>
+          </div>
+        )}
+        {regResult && (
+          <div style={{ background: "rgba(102,126,234,.1)", borderRadius: 12, padding: "10px", marginBottom: 8, animation: "fadeIn .3s ease-out" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: FF }}>{"\u2713 \u767b\u9332\u6e08\u307f"}</div>
+            {regResult.weeklyRank > 0 && <div style={{ fontSize: 11, color: "#FFEAA7", marginTop: 2 }}>{"\ud83d\udcc5 \u9031\u9593 " + regResult.weeklyRank + "\u4f4d"}</div>}
+            {regResult.alltimeRank > 0 && <div style={{ fontSize: 11, color: "#74B9FF", marginTop: 2 }}>{"\u265e \u6c38\u4e45 " + regResult.alltimeRank + "\u4f4d"}</div>}
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={onHome} style={{ flex: 1, background: "rgba(255,255,255,.06)", border: "none", borderRadius: 14, padding: "10px 0", color: "rgba(255,255,255,.5)", fontSize: 13, fontWeight: 700, fontFamily: FF, cursor: "pointer" }}>{"\u2190 \u30db\u30fc\u30e0"}</button>
+          <button onClick={onRetry} style={{ flex: 1, background: "linear-gradient(135deg,#667eea,#764ba2)", border: "none", borderRadius: 14, padding: "10px 0", color: "#fff", fontSize: 13, fontWeight: 700, fontFamily: FF, cursor: "pointer" }}>{"\u21bb \u518d\u6311\u6226"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---- LINE Confirm Dialog ---- */
+function LineConfirm(props) {
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 950, background: "rgba(0,0,0,.6)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div style={{ background: "linear-gradient(145deg,#1a1a2e,#16213e)", borderRadius: 20, padding: "24px 20px", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,.6)", border: "1px solid rgba(255,255,255,.08)", animation: "popIn .25s ease-out", maxWidth: 320, width: "100%" }}>
+        <div style={{ fontSize: 28, marginBottom: 8 }}>{"\u26a0\ufe0f"}</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", fontFamily: FF, marginBottom: 6 }}>{props.alt + "ALT\u3092\u5831\u544a\u3057\u3066\u30ea\u30bb\u30c3\u30c8\u3057\u307e\u3059"}</div>
+        <div style={{ fontSize: 11, color: "rgba(255,255,255,.35)", marginBottom: 16 }}>{"\u9001\u4fe1\u5f8c\u3001ALT\u306f0\u306b\u623b\u308a\u307e\u3059"}</div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={props.onCancel} style={{ flex: 1, padding: "12px 0", borderRadius: 14, border: "none", background: "rgba(255,255,255,.06)", color: "rgba(255,255,255,.5)", fontFamily: FF, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{"\u3084\u3081\u308b"}</button>
+          <button onClick={props.onSend} style={{ flex: 1, padding: "12px 0", borderRadius: 14, border: "none", background: "linear-gradient(135deg,#06C755,#04a849)", color: "#fff", fontFamily: FF, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{"OK\uff01\u9001\u308b"}</button>
+        </div>
       </div>
     </div>
   );
@@ -238,6 +406,7 @@ function ResultScr(props) {
 
 /* ======== MAIN ======== */
 function FractionFusion() {
+  var _screen = useState("home"), screen = _screen[0], setScreen = _screen[1];
   var _diff = useState(null), diff = _diff[0], setDiff = _diff[1];
   var _cards = useState([]), cards = _cards[0], setCards = _cards[1];
   var _rules = useState(true), rules = _rules[0], setRules = _rules[1];
@@ -257,8 +426,54 @@ function FractionFusion() {
   var dragged = useRef(false);
   var sRef = useRef({ del: del, spUses: spUses }); sRef.current = { del: del, spUses: spUses };
 
+  /* ALT system state */
+  var _alt = useState(0), alt = _alt[0], setAlt = _alt[1];
+  var _combo = useState(0), combo = _combo[0], setCombo = _combo[1];
+  var _cleared = useState({}), cleared = _cleared[0], setCleared = _cleared[1];
+  var _resultAlt = useState(null), resultAlt = _resultAlt[0], setResultAlt = _resultAlt[1];
+  var _lineName = useState(""), lineName = _lineName[0], setLineName = _lineName[1];
+  var _lineConfirm = useState(false), lineConfirm = _lineConfirm[0], setLineConfirm = _lineConfirm[1];
+  var _highScore = useState(0), highScore = _highScore[0], setHighScore = _highScore[1];
+  var _autoSimp = useState(null), autoSimp = _autoSimp[0], setAutoSimp = _autoSimp[1];
+  var _savedName = useState(""), savedName = _savedName[0], setSavedName = _savedName[1];
+  var _regResult = useState(null), regResult = _regResult[0], setRegResult = _regResult[1];
+  var _regLoading = useState(false), regLoading = _regLoading[0], setRegLoading = _regLoading[1];
+  var _registered = useState(false), registered = _registered[0], setRegistered = _registered[1];
+
   var cfg = DIFFICULTIES[diff] || DIFFICULTIES.normal;
   var live = cards.length > 0 ? calcSc(del, cards, diff || "normal") : { total: 0 };
+
+  /* Load saved name */
+  useEffect(function() {
+    ST.get("ranking:me", false).then(function(r) { if (r && r.value) setSavedName(r.value); });
+  }, []);
+  /* Weekly reset check */
+  useEffect(function() {
+    ST.get("ranking:weekly:reset", true).then(function(r) {
+      var rt = r && r.value ? parseInt(r.value) : 0;
+      if (!rt || isWeeklyExpired(rt)) {
+        var next = getNextMonday4am();
+        ST.set("ranking:weekly:reset", String(next), true);
+        DIFF_KEYS.forEach(function(dk) { ST.set("ranking:weekly:" + dk, "[]", true); });
+      }
+    });
+  }, []);
+
+  /* Auto-simplify: when merge result has n===d, flash then simplify */
+  var triggerAutoSimp = useCallback(function(cardId) {
+    setAutoSimp(cardId);
+    setTimeout(function() {
+      setCards(function(prev) {
+        return prev.map(function(c) {
+          if (c.id === cardId && c.n === c.d && c.d > 0) {
+            return Object.assign({}, c, { n: 1, d: 1 });
+          }
+          return c;
+        });
+      });
+      setAutoSimp(null);
+    }, 700);
+  }, []);
 
   var findC = useCallback(function(cx, cy, ex) {
     var els = document.querySelectorAll("[data-cid]");
@@ -284,13 +499,13 @@ function FractionFusion() {
     ints.forEach(function(dc) {
       setDel(function(p) { return p.concat([{ depth: dc.depth, n: dc.n }]); });
     });
+    setCombo(function(c) { return c + ints.length; });
     var rem = cards.filter(function(c) { return c.d !== 1; });
     rem.sort(function(a, b) { return a.slot - b.slot; });
     rem.forEach(function(c, i) { c.slot = i; });
     setCards(rem.slice());
   }, [cards, saveH]);
 
-  /* Pointer for cards */
   var onPD = useCallback(function(e, card) {
     if (formula || result || cMenu || spOp || rules || !diff) return;
     e.preventDefault();
@@ -300,7 +515,6 @@ function FractionFusion() {
     setDragSp(null);
   }, [formula, result, cMenu, spOp, rules, diff]);
 
-  /* Pointer for special cards */
   var onSpDown = useCallback(function(e, spNum) {
     if (formula || result || cMenu || spOp || rules || !diff || spUses <= 0) return;
     e.preventDefault();
@@ -351,15 +565,21 @@ function FractionFusion() {
     rem.sort(function(x, y) { return x.slot - y.slot; });
     rem.forEach(function(c, i) { c.slot = i; });
     setCards(rem); setFormula(null);
-  }, [formula, cards]);
+    setCombo(function(c) { return c + 1; });
+    /* Auto-simplify if n===d (e.g. 2/2, 3/3) */
+    if (res.n === res.d && res.d > 1) { triggerAutoSimp(nc.id); }
+  }, [formula, cards, triggerAutoSimp]);
 
   var onSpChoose = useCallback(function(newFrac) {
     if (!spOp) return;
     saveH();
-    setCards(function(p) { return p.map(function(c) { return c.id === spOp.target.id ? Object.assign({}, c, { n: newFrac.n, d: newFrac.d }) : c; }); });
+    var tid = spOp.target.id;
+    setCards(function(p) { return p.map(function(c) { return c.id === tid ? Object.assign({}, c, { n: newFrac.n, d: newFrac.d }) : c; }); });
     setSpUses(function(u) { return u - 1; });
     setSpOp(null);
-  }, [spOp, saveH]);
+    /* Auto-simplify if result has n===d */
+    if (newFrac.n === newFrac.d && newFrac.d > 1) { triggerAutoSimp(tid); }
+  }, [spOp, saveH, triggerAutoSimp]);
 
   var doSimp = useCallback(function() {
     if (!cMenu) return;
@@ -384,22 +604,70 @@ function FractionFusion() {
     setHist(function(h) { return h.slice(0, -1); });
     setHMeta(function(h) { return h.slice(0, -1); });
     setFormula(null); setCMenu(null); setSpOp(null);
+    setCombo(0);
   }, [hist, hMeta]);
 
-  var finish = useCallback(function() { setResult(true); setCMenu(null); }, []);
+  var finish = useCallback(function() {
+    var sc = calcSc(del, cards, diff);
+    var stars = getStars(sc);
+    var earned = clearAlt(stars);
+    var fcb = 0;
+    if (!cleared[diff]) { fcb = FIRST_CLEAR_BONUS; setCleared(function(p) { var n = {}; for (var k in p) n[k] = p[k]; n[diff] = true; return n; }); }
+    var totalEarned = earned + fcb;
+    setAlt(function(a) { return a + totalEarned; });
+    if (sc.total > highScore) setHighScore(sc.total);
+    setResultAlt({ earned: totalEarned, firstBonus: fcb, stars: stars });
+    setResult(true); setCMenu(null); setRegResult(null); setRegistered(false);
+  }, [del, cards, diff, cleared, highScore]);
+
+  /* Ranking registration */
+  var registerRanking = useCallback(function(name, score) {
+    if (registered || score > MAX_SCORE) return;
+    setRegLoading(true); setSavedName(name);
+    ST.set("ranking:me", name, false);
+    var time = Date.now();
+    var entry = { name: name, score: score, time: time };
+    var wKey = "ranking:weekly:" + diff;
+    var aKey = "ranking:alltime:" + diff;
+    Promise.all([
+      ST.get(wKey, true).then(function(r) { try { return r && r.value ? JSON.parse(r.value) : []; } catch(e) { return []; } }).then(function(list) {
+        var nl = insertRanking(list, entry, 10);
+        return ST.set(wKey, JSON.stringify(nl), true).then(function() { return findMyRank(nl, name, score, time); });
+      }),
+      ST.get(aKey, true).then(function(r) { try { return r && r.value ? JSON.parse(r.value) : []; } catch(e) { return []; } }).then(function(list) {
+        var nl = insertRanking(list, entry, 10);
+        return ST.set(aKey, JSON.stringify(nl), true).then(function() { return findMyRank(nl, name, score, time); });
+      })
+    ]).then(function(ranks) {
+      setRegResult({ weeklyRank: ranks[0], alltimeRank: ranks[1] });
+      setRegLoading(false); setRegistered(true);
+    });
+  }, [diff, registered]);
+
   var startGame = useCallback(function(d) {
-    setDiff(d); setCards(makePuzzle(d)); setRules(false); setResult(false);
+    setDiff(d); setCards(makePuzzle(d)); setScreen("game"); setRules(false); setResult(false);
     setDel([]); setHist([]); setHMeta([]); setFormula(null); setSpUses(3);
+    setCombo(0); setResultAlt(null); setAutoSimp(null); setRegResult(null); setRegistered(false);
   }, []);
   var retry = useCallback(function() {
     if (!diff) return;
     setCards(makePuzzle(diff)); setResult(false); setDel([]); setHist([]); setHMeta([]);
-    setFormula(null); setSpUses(3);
+    setFormula(null); setSpUses(3); setCombo(0); setResultAlt(null); setAutoSimp(null); setRegResult(null); setRegistered(false);
   }, [diff]);
   var backToMenu = useCallback(function() {
-    setDiff(null); setRules(true); setResult(false); setCards([]); setDel([]);
+    setDiff(null); setScreen("home"); setRules(true); setResult(false); setCards([]); setDel([]);
     setHist([]); setHMeta([]); setFormula(null); setSpUses(3);
+    setCombo(0); setResultAlt(null); setAutoSimp(null);
   }, []);
+
+  /* LINE report */
+  var sendLine = useCallback(function() {
+    var msg = "\u3010\u5206\u6570\u878d\u5408 ALT\u5831\u544a\u3011\n\u540d\u524d: " + lineName + "\n\ud83d\udcb0 " + alt + "ALT\n\u30cf\u30a4\u30b9\u30b3\u30a2: " + highScore + "\u70b9";
+    var url = "https://line.me/R/oaMessage/@trail_official/?" + encodeURIComponent(msg);
+    try { window.open(url, "_blank"); } catch (e) { /* ignore */ }
+    setAlt(0); setHighScore(0); setCleared({});
+    setLineConfirm(false);
+  }, [lineName, alt, highScore]);
 
   useEffect(function() {
     function h(e) { if (e.key === "Escape") { setCMenu(null); setSpOp(null); } }
@@ -407,75 +675,114 @@ function FractionFusion() {
     return function() { window.removeEventListener("keydown", h); };
   }, []);
 
-  /* TRAIL連携: URLパラメータ自動開始はデプロイ後に有効化 */
-
+  var isTablet = typeof window !== "undefined" && window.innerWidth >= 600;
   var gridCols = cards.length <= 2 ? 2 : cards.length <= 4 ? 2 : cards.length <= 9 ? 3 : 5;
   var gridRows = Math.max(1, Math.ceil(cards.length / gridCols));
-  var cardFont = cards.length <= 2 ? 32 : cards.length <= 4 ? 28 : cards.length <= 9 ? 24 : 18;
+  var baseFont = cards.length <= 2 ? 32 : cards.length <= 4 ? 28 : cards.length <= 9 ? 24 : 18;
+  var cardFont = isTablet ? Math.round(baseFont * 1.3) : baseFont;
+  var headerH = isTablet ? 44 : 30;
   var finishActive = del.length > 0;
   var hasOnes = cards.some(function(c) { return c.d === 1; });
   var oneCount = cards.filter(function(c) { return c.d === 1; }).length;
+  var lineValid = lineName.trim().length > 0 && alt > 0;
 
-  /* ======== TITLE SCREEN ======== */
+  /* ======== RANKING SCREEN ======== */
+  if (screen === "ranking") {
+    return <RankingScreen onBack={function() { setScreen("home"); }} myName={savedName} />;
+  }
+
+  /* ======== TITLE / HOME SCREEN ======== */
   if (rules) {
     return (
-      <div style={{ width: "100%", minHeight: "100vh", background: "linear-gradient(150deg,#0a0a1a 0%,#141432 40%,#0d1b2a 100%)", fontFamily: FF, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20, userSelect: "none" }}>
+      <div style={{ width: "100%", minHeight: "100vh", background: "linear-gradient(150deg,#0a0a1a 0%,#141432 40%,#0d1b2a 100%)", fontFamily: FF, display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 20px 40px", userSelect: "none", overflowY: "auto" }}>
         <style>{CSS}</style>
-        <div style={{ animation: "fadeIn .5s ease-out", textAlign: "center", maxWidth: 380, width: "100%" }}>
-          <div style={{ fontSize: 48, marginBottom: 8 }}>{"\ud83e\uddea"}</div>
-          <div style={{ fontSize: 26, fontWeight: 700, fontFamily: FF, background: "linear-gradient(135deg,#FF6B6B,#FFEAA7,#4ECDC4)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", marginBottom: 6 }}>{"\u5206\u6570\u878d\u5408"}</div>
-          <div style={{ fontSize: 13, color: "rgba(255,255,255,.4)", marginBottom: 24 }}>{"\u30ab\u30fc\u30c9\u3092\u305f\u3057\u7b97\u3067\u5408\u4f53\u3055\u305b\u3066\u300c1\u300d\u3092\u4f5c\u308d\u3046\uff01"}</div>
+        {/* ALT badge top-right */}
+        <div style={{ position: "fixed", top: 10, right: 10, zIndex: 100, background: "rgba(78,205,196,.12)", border: "1px solid rgba(78,205,196,.3)", borderRadius: 20, padding: "4px 14px", display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 16 }}>{"\ud83e\ude99"}</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#4ECDC4", fontFamily: FF }}>{alt + " ALT"}</span>
+        </div>
+
+        <div style={{ animation: "fadeIn .5s ease-out", textAlign: "center", maxWidth: isTablet ? 500 : 380, width: "100%", marginTop: 30 }}>
+          <div style={{ fontSize: isTablet ? 56 : 48, marginBottom: 8 }}>{"\ud83e\uddea"}</div>
+          <div style={{ fontSize: isTablet ? 32 : 26, fontWeight: 700, fontFamily: FF, background: "linear-gradient(135deg,#FF6B6B,#FFEAA7,#4ECDC4)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", marginBottom: 6 }}>{"\u5206\u6570\u878d\u5408"}</div>
+          <div style={{ fontSize: isTablet ? 16 : 13, color: "rgba(255,255,255,.4)", marginBottom: 24 }}>{"\u30ab\u30fc\u30c9\u3092\u305f\u3057\u7b97\u3067\u5408\u4f53\u3055\u305b\u3066\u6574\u6570\u3092\u4f5c\u308d\u3046\uff01"}</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
             {["easy", "normal", "hard"].map(function(key) {
               var d = DIFFICULTIES[key];
+              var done = cleared[key];
               return (
-                <button key={key} onClick={function() { startGame(key); }} style={{ background: "rgba(255,255,255,.04)", border: "2px solid " + d.color + "44", borderRadius: 16, padding: "16px 20px", cursor: "pointer", display: "flex", alignItems: "center", gap: 14, transition: "all .2s" }}>
-                  <div style={{ fontSize: 32 }}>{d.emoji}</div>
+                <button key={key} onClick={function() { startGame(key); }} style={{ background: "rgba(255,255,255,.04)", border: "2px solid " + d.color + "44", borderRadius: isTablet ? 20 : 16, padding: isTablet ? "20px 24px" : "16px 20px", cursor: "pointer", display: "flex", alignItems: "center", gap: isTablet ? 18 : 14, transition: "all .2s", position: "relative" }}>
+                  <div style={{ fontSize: isTablet ? 40 : 32 }}>{d.emoji}</div>
                   <div style={{ textAlign: "left", flex: 1 }}>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: d.color, fontFamily: FF }}>{d.label}</div>
-                    <div style={{ fontSize: 11, color: "rgba(255,255,255,.4)", fontFamily: FF }}>{d.desc}</div>
+                    <div style={{ fontSize: isTablet ? 22 : 18, fontWeight: 700, color: d.color, fontFamily: FF }}>{d.label}</div>
+                    <div style={{ fontSize: isTablet ? 13 : 11, color: "rgba(255,255,255,.4)", fontFamily: FF }}>{d.desc}</div>
                   </div>
+                  {done && <span style={{ fontSize: 10, color: "#4ECDC4", fontWeight: 700, background: "rgba(78,205,196,.1)", borderRadius: 8, padding: "2px 8px" }}>{"\u2713\u30af\u30ea\u30a2"}</span>}
                 </button>
               );
             })}
           </div>
-          <div style={{ background: "rgba(255,255,255,.03)", borderRadius: 14, padding: "14px 16px", textAlign: "left" }}>
+          {/* Ranking button */}
+          <button onClick={function() { setScreen("ranking"); }} style={{ width: "100%", padding: "14px", borderRadius: 16, border: "2px solid rgba(255,215,0,.2)", background: "rgba(255,215,0,.06)", color: "#FFD700", fontFamily: FF, fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+            <span>{"\ud83c\udfc6"}</span><span>{"\u30e9\u30f3\u30ad\u30f3\u30b0"}</span>
+          </button>
+          <div style={{ background: "rgba(255,255,255,.03)", borderRadius: 14, padding: "14px 16px", textAlign: "left", marginBottom: 24 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,.5)", marginBottom: 8 }}>{"\ud83c\udfae \u3042\u305d\u3073\u304b\u305f"}</div>
-            {["\ud83d\udc46 \u30ab\u30fc\u30c9\u3092\u91cd\u306d\u308b \u2192 \u305f\u3057\u7b97\u3067\u5408\u4f53", "\ud83d\udc47 \u30bf\u30c3\u30d7 \u2192 \u7d04\u5206\u30fb\u901a\u5206", "\ud83d\udce6 1\u3092\u4f5c\u3063\u305f\u3089\u7d0d\u54c1\u30dc\u30bf\u30f3\u3067\u7d0d\u54c1", "\u2b50 \u30b9\u30da\u30b7\u30e3\u30eb(2,3,5,7)\u3092\u30ab\u30fc\u30c9\u306b\u91cd\u306d\u3066\u00d7\u00f7\uff083\u56de\uff09"].map(function(t, i) {
+            {["\ud83d\udc46 \u30ab\u30fc\u30c9\u3092\u91cd\u306d\u308b \u2192 \u305f\u3057\u7b97\u3067\u5408\u4f53", "\ud83d\udc47 \u30bf\u30c3\u30d7 \u2192 \u7d04\u5206\u30fb\u901a\u5206", "\ud83d\udce6 \u6574\u6570\u3092\u4f5c\u3063\u305f\u3089\u7d0d\u54c1\u30dc\u30bf\u30f3\u3067\u7d0d\u54c1", "\u2b50 \u30b9\u30da\u30b7\u30e3\u30eb(2,3,5,7)\u3092\u30ab\u30fc\u30c9\u306b\u91cd\u306d\u3066\u00d7\u00f7\uff083\u56de\uff09", "\ud83e\ude99 \u5408\u4f53\u30fb\u7d0d\u54c1\u3067ALT\u7372\u5f97\uff01\u30b3\u30f3\u30dc\u3067\u30dc\u30fc\u30ca\u30b9\u2191"].map(function(t, i) {
               return <div key={i} style={{ fontSize: 11, color: "rgba(255,255,255,.4)", marginBottom: 2 }}>{t}</div>;
             })}
           </div>
+
+          {/* LINE Report Section */}
+          <div style={{ background: "rgba(6,199,85,.06)", border: "1px solid rgba(6,199,85,.2)", borderRadius: 16, padding: "16px", textAlign: "center" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#06C755", fontFamily: FF, marginBottom: 10 }}>{"\ud83d\udcb0 ALT\u3092TRAIL\u306b\u5831\u544a\u3059\u308b"}</div>
+            <input
+              value={lineName}
+              onChange={function(e) { setLineName(e.target.value); }}
+              placeholder={"\u540d\u524d\u3092\u5165\u529b"}
+              style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.05)", color: "#fff", fontFamily: FF, fontSize: 14, marginBottom: 10, outline: "none" }}
+            />
+            <button
+              onClick={function() { if (lineValid) setLineConfirm(true); }}
+              disabled={!lineValid}
+              style={{ width: "100%", padding: "12px 0", borderRadius: 12, border: "none", background: lineValid ? "linear-gradient(135deg,#06C755,#04a849)" : "rgba(255,255,255,.05)", color: lineValid ? "#fff" : "rgba(255,255,255,.2)", fontFamily: FF, fontSize: 14, fontWeight: 700, cursor: lineValid ? "pointer" : "default", opacity: lineValid ? 1 : 0.5 }}
+            >{"\ud83d\udcac LINE\u3067\u5831\u544a\u3059\u308b"}</button>
+            {alt === 0 && <div style={{ fontSize: 10, color: "rgba(255,255,255,.2)", marginTop: 6 }}>{"\u203b \u30b2\u30fc\u30e0\u3067ALT\u3092\u7372\u5f97\u3057\u3066\u304b\u3089\u5831\u544a\u3067\u304d\u307e\u3059"}</div>}
+          </div>
         </div>
+        {lineConfirm && <LineConfirm alt={alt} onCancel={function() { setLineConfirm(false); }} onSend={sendLine} />}
       </div>
     );
   }
 
   /* ======== GAME SCREEN ======== */
   return (
-    <div style={{ width: "100%", height: "100dvh", background: "linear-gradient(150deg,#0a0a1a 0%,#141432 40%,#0d1b2a 100%)", fontFamily: FF, position: "relative", overflow: "hidden", userSelect: "none", touchAction: "none" }}>
+    <div style={{ width: "100%", height: "100dvh", background: "linear-gradient(150deg,#0a0a1a 0%,#141432 40%,#0d1b2a 100%)", fontFamily: FF, position: "relative", overflow: "hidden", userSelect: "none", touchAction: "none", maxWidth: isTablet ? 800 : undefined, margin: isTablet ? "0 auto" : undefined }}>
       <style>{CSS}</style>
 
-      {/* === HEADER: 0-30px === */}
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 30, padding: "0 8px", display: "flex", alignItems: "center", gap: 4, zIndex: 30, background: "#0a0a1a" }}>
-        <button onClick={backToMenu} style={{ background: "none", border: "none", fontSize: 14, color: "rgba(255,255,255,.4)", cursor: "pointer", padding: "2px" }}>{"\u2190"}</button>
-        <div style={{ fontSize: 13, fontWeight: 700, background: "linear-gradient(135deg,#FF6B6B,#FFEAA7,#4ECDC4)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{"\u5206\u6570\u878d\u5408"}</div>
-        <span style={{ fontSize: 8, color: cfg.color, background: cfg.color + "22", borderRadius: 5, padding: "1px 4px", fontWeight: 600 }}>{cfg.emoji + cfg.label}</span>
+      {/* === HEADER === */}
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: headerH, padding: isTablet ? "0 14px" : "0 8px", display: "flex", alignItems: "center", gap: isTablet ? 8 : 4, zIndex: 30, background: "#0a0a1a" }}>
+        <button onClick={backToMenu} style={{ background: "none", border: "none", fontSize: isTablet ? 20 : 14, color: "rgba(255,255,255,.4)", cursor: "pointer", padding: "2px" }}>{"\u2190"}</button>
+        <div style={{ fontSize: isTablet ? 17 : 13, fontWeight: 700, background: "linear-gradient(135deg,#FF6B6B,#FFEAA7,#4ECDC4)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{"\u5206\u6570\u878d\u5408"}</div>
+        <span style={{ fontSize: isTablet ? 11 : 8, color: cfg.color, background: cfg.color + "22", borderRadius: 5, padding: isTablet ? "2px 6px" : "1px 4px", fontWeight: 600 }}>{cfg.emoji + cfg.label}</span>
         <div style={{ flex: 1 }} />
-        <button onClick={undo} disabled={hist.length === 0} style={{ background: hist.length ? "rgba(255,255,255,.08)" : "transparent", border: "none", borderRadius: 6, padding: "3px 6px", color: hist.length ? "rgba(255,255,255,.5)" : "rgba(255,255,255,.1)", fontSize: 10, fontFamily: FF, cursor: "pointer" }}>{"\u21a9"}</button>
-        <button onClick={retry} style={{ background: "rgba(255,107,107,.1)", border: "none", borderRadius: 6, padding: "3px 6px", color: "#FF6B6B", fontSize: 10, fontFamily: FF, cursor: "pointer" }}>{"\u21bb"}</button>
-        <span style={{ fontSize: 9, color: "rgba(255,255,255,.2)" }}>{"\u6b8b" + cards.length}</span>
-        <div style={{ background: "linear-gradient(135deg,#667eea,#764ba2)", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700, color: "#fff" }}>{live.total}</div>
+        {combo >= 2 && <span style={{ fontSize: isTablet ? 12 : 9, color: "#4ECDC4", fontWeight: 700, background: "rgba(78,205,196,.15)", borderRadius: 5, padding: isTablet ? "2px 8px" : "1px 5px" }}>{combo + "combo"}</span>}
+        <button onClick={undo} disabled={hist.length === 0} style={{ background: hist.length ? "rgba(255,255,255,.08)" : "transparent", border: "none", borderRadius: 6, padding: isTablet ? "4px 10px" : "3px 6px", color: hist.length ? "rgba(255,255,255,.5)" : "rgba(255,255,255,.1)", fontSize: isTablet ? 14 : 10, fontFamily: FF, cursor: "pointer" }}>{"\u21a9"}</button>
+        <button onClick={retry} style={{ background: "rgba(255,107,107,.1)", border: "none", borderRadius: 6, padding: isTablet ? "4px 10px" : "3px 6px", color: "#FF6B6B", fontSize: isTablet ? 14 : 10, fontFamily: FF, cursor: "pointer" }}>{"\u21bb"}</button>
+        <span style={{ fontSize: isTablet ? 12 : 9, color: "rgba(255,255,255,.2)" }}>{"\u6b8b" + cards.length}</span>
+        <div style={{ background: "linear-gradient(135deg,#667eea,#764ba2)", borderRadius: 6, padding: isTablet ? "3px 12px" : "1px 8px", fontSize: isTablet ? 14 : 11, fontWeight: 700, color: "#fff" }}>{live.total}</div>
       </div>
 
-      {/* === CARDS: 30px to 70% === */}
-      <div style={{ position: "absolute", top: 30, left: 6, right: 6, bottom: "30dvh", overflow: "hidden", zIndex: 10 }}>
-        <div style={{ width: "100%", height: "100%", display: "grid", gridTemplateColumns: "repeat(" + gridCols + ",1fr)", gridTemplateRows: "repeat(" + gridRows + ",1fr)", gap: 4, touchAction: "none" }}>
+      {/* === CARDS === */}
+      <div style={{ position: "absolute", top: headerH, left: isTablet ? 12 : 6, right: isTablet ? 12 : 6, bottom: isTablet ? "28dvh" : "30dvh", overflow: "hidden", zIndex: 10 }}>
+        <div style={{ width: "100%", height: "100%", display: "grid", gridTemplateColumns: "repeat(" + gridCols + ",1fr)", gridTemplateRows: "repeat(" + gridRows + ",1fr)", gap: isTablet ? 8 : 4, touchAction: "none" }}>
           {cards.map(function(card) {
             var isDg = dRender && dRender.id === card.id && !dragSp;
             var isHv = hovId === card.id;
             var col = getCol(card.id);
             var c1 = card.d === 1;
             var cu1 = isOne(card) && !c1;
+            var isSimping = autoSimp === card.id;
             var dx = isDg ? dRender.dx : 0;
             var dy = isDg ? dRender.dy : 0;
             var isLast = cards.length === 1;
@@ -485,7 +792,8 @@ function FractionFusion() {
             var bdr = isHv ? "3px solid #74B9FF" : c1 ? "3px solid #FFD700" : cu1 ? "3px solid #FFA500" : "1px solid rgba(255,255,255,.08)";
             return (
               <div key={card.id} data-cid={card.id} onPointerDown={function(e) { onPD(e, card); }}
-                style={{ borderRadius: 10, gridColumn: isLast ? "1/-1" : undefined, maxWidth: isLast ? 100 : undefined, justifySelf: isLast ? "center" : undefined, background: bg, border: bdr, cursor: isDg ? "grabbing" : "grab", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden", zIndex: isDg ? 100 : 1, transform: isDg ? "translate(" + dx + "px," + dy + "px) scale(1.15) rotate(-3deg)" : isHv ? "scale(1.08)" : "scale(1)", transition: isDg ? "none" : "all .2s", animation: isHv ? "dropTarget .6s infinite" : c1 ? "winGlow 2s infinite" : cu1 ? "cu1Pulse 2s infinite" : isDg ? "none" : "cardAppear .35s ease-out", boxShadow: isDg ? "0 20px 50px rgba(0,0,0,.6)" : c1 ? "0 6px 20px rgba(255,215,0,.3)" : cu1 ? "0 4px 16px rgba(255,165,0,.3)" : "0 2px 8px rgba(0,0,0,.3)", minHeight: 0, minWidth: 0 }}>
+                style={{ borderRadius: isTablet ? 14 : 10, gridColumn: isLast ? "1/-1" : undefined, maxWidth: isLast ? (isTablet ? 150 : 100) : undefined, justifySelf: isLast ? "center" : undefined, background: bg, border: bdr, cursor: isDg ? "grabbing" : "grab", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative", overflow: "visible", zIndex: isDg ? 100 : isSimping ? 50 : 1, transform: isDg ? "translate(" + dx + "px," + dy + "px) scale(1.15) rotate(-3deg)" : isHv ? "scale(1.08)" : "scale(1)", transition: isDg ? "none" : "all .2s", animation: isSimping ? "simpFlash .7s ease-out" : isHv ? "dropTarget .6s infinite" : c1 ? "winGlow 2s infinite" : cu1 ? "cu1Pulse 2s infinite" : isDg ? "none" : "cardAppear .35s ease-out", boxShadow: isDg ? "0 20px 50px rgba(0,0,0,.6)" : isSimping ? "0 0 30px rgba(255,255,255,.6)" : c1 ? "0 6px 20px rgba(255,215,0,.3)" : cu1 ? "0 4px 16px rgba(255,165,0,.3)" : "0 2px 8px rgba(0,0,0,.3)", minHeight: 0, minWidth: 0 }}>
+                {isSimping && <div style={{ position: "absolute", top: -24, left: "50%", transform: "translateX(-50%)", whiteSpace: "nowrap", animation: "simpText 1.2s ease-out forwards", zIndex: 200 }}><span style={{ fontSize: 13, fontWeight: 700, color: "#FFD700", fontFamily: FF, textShadow: "0 1px 6px rgba(255,215,0,.6)" }}>{"\u2728\u7d04\u5206\uff01"}</span></div>}
                 {card.depth > 0 && <div style={{ position: "absolute", top: 1, left: 2, background: "rgba(0,0,0,.5)", borderRadius: 4, padding: "0 3px", fontSize: 8, fontWeight: 700, color: dCol(card.depth) }}>{"\ud83d\udd25" + card.depth}</div>}
                 {cu1 && <div style={{ position: "absolute", top: 2, right: 2, fontSize: 9, color: "#fff", fontWeight: 700, background: "rgba(255,140,0,.8)", borderRadius: 5, padding: "1px 5px" }}>{"\u30bf\u30c3\u30d7\u21921"}</div>}
                 {card.d === 1 ? (
@@ -504,9 +812,8 @@ function FractionFusion() {
         </div>
       </div>
 
-      {/* === BOTTOM: 30dvh === */}
-      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "30dvh", display: "flex", gap: 6, padding: "6px", alignItems: "stretch", zIndex: 20, background: "#0d0d20", borderTop: "2px solid rgba(255,255,255,.08)" }}>
-        {/* SP cards - flex:1 = half width */}
+      {/* === BOTTOM === */}
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: isTablet ? "28dvh" : "30dvh", display: "flex", gap: isTablet ? 10 : 6, padding: isTablet ? "10px" : "6px", alignItems: "stretch", zIndex: 20, background: "#0d0d20", borderTop: "2px solid rgba(255,255,255,.08)" }}>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
           <span style={{ fontSize: 9, color: "rgba(162,155,254,.5)", fontWeight: 600, textAlign: "center" }}>{"\u2b50\u30b9\u30da\u30b7\u30e3\u30eb " + spUses + "/3"}</span>
           <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", gap: 5, minHeight: 0 }}>
@@ -518,16 +825,13 @@ function FractionFusion() {
               return (
                 <div key={num} onPointerDown={function(e) { onSpDown(e, num); }}
                   style={{ borderRadius: 12, touchAction: "none", background: disabled ? "rgba(255,255,255,.03)" : "linear-gradient(135deg,#A29BFE,#667eea)", border: "2px solid " + (disabled ? "rgba(255,255,255,.05)" : "rgba(162,155,254,.4)"), cursor: disabled ? "default" : "grab", display: "flex", alignItems: "center", justifyContent: "center", zIndex: isDg ? 100 : 1, transform: isDg ? "translate(" + dx + "px," + dy + "px) scale(1.15)" : "scale(1)", transition: isDg ? "none" : "all .2s", opacity: disabled ? 0.3 : 1, minWidth: 0, minHeight: 0, boxShadow: disabled ? "none" : "0 2px 8px rgba(162,155,254,.2)" }}>
-                  <span style={{ fontSize: 24, fontWeight: 700, color: "#fff", fontFamily: FF }}>{num}</span>
+                  <span style={{ fontSize: isTablet ? 32 : 24, fontWeight: 700, color: "#fff", fontFamily: FF }}>{num}</span>
                 </div>
               );
             })}
           </div>
         </div>
-
-        {/* Dock + Finish - flex:1 = half width */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
-          {/* Dock */}
           <div id="dock" style={{ flex: 1, borderRadius: 16, padding: "8px 10px", background: "linear-gradient(135deg, rgba(255,215,0,.1), rgba(255,165,0,.06))", border: "2.5px dashed rgba(255,215,0,.45)", animation: "dockGlow 2.5s infinite", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 6, overflow: "hidden", minHeight: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ fontSize: 22 }}>{"\ud83d\udce6"}</span>
@@ -552,10 +856,9 @@ function FractionFusion() {
               </div>
             )}
           </div>
-          {/* Finish button */}
-          <button onClick={finish} style={{ borderRadius: 14, border: "none", padding: "10px 0", background: finishActive ? "linear-gradient(135deg,#667eea,#764ba2)" : "rgba(255,255,255,.05)", color: finishActive ? "#fff" : "rgba(255,255,255,.25)", fontFamily: FF, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, flexShrink: 0, boxShadow: finishActive ? "0 3px 12px rgba(102,126,234,.4)" : "none" }}>
-            <span style={{ fontSize: 20 }}>{cards.length === 1 ? "\ud83c\udfc6" : "\u2728"}</span>
-            <span>{del.length > 0 || cards.length === 1 ? "\u7d50\u679c\u3092\u898b\u308b" : "\u7d42\u4e86"}</span>
+          <button onClick={finish} disabled={!finishActive} style={{ borderRadius: 14, border: "none", padding: "10px 0", background: finishActive ? "linear-gradient(135deg,#667eea,#764ba2)" : "rgba(255,255,255,.05)", color: finishActive ? "#fff" : "rgba(255,255,255,.25)", fontFamily: FF, fontSize: 14, fontWeight: 700, cursor: finishActive ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, flexShrink: 0, boxShadow: finishActive ? "0 3px 12px rgba(102,126,234,.4)" : "none" }}>
+            <span style={{ fontSize: 20 }}>{"\u2728"}</span>
+            <span>{del.length > 0 ? "\u7d50\u679c\u3092\u898b\u308b" : "\u7d42\u4e86"}</span>
           </button>
         </div>
       </div>
@@ -597,7 +900,7 @@ function FractionFusion() {
           </div>
         </div>
       )}
-      {result && <ResultScr del={del} cards={cards} onRetry={retry} diff={diff} />}
+      {result && resultAlt && <ResultScr del={del} cards={cards} onRetry={retry} onHome={backToMenu} diff={diff} earned={resultAlt.earned} firstBonus={resultAlt.firstBonus} totalAlt={alt} stars={resultAlt.stars} onRegister={registerRanking} regResult={regResult} regLoading={regLoading} savedName={savedName} />}
     </div>
   );
 }
