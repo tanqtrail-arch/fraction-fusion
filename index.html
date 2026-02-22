@@ -4,11 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>分数融合 - Fraction Fusion</title>
+<link rel="stylesheet" href="https://trail-game-pro.onrender.com/sdk/trail-auth.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&display=swap">
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'M PLUS Rounded 1c', 'Fredoka', sans-serif; }
   html, body, #root { width: 100%; height: 100dvh; overflow: hidden; }
   body { background: #0a0a1a; }
 </style>
+<script src="https://trail-game-pro.onrender.com/sdk/trail-sdk.js"></script>
+<script src="https://trail-game-pro.onrender.com/sdk/trail-auth.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js"></script>
@@ -21,6 +25,13 @@ var useCallback = React.useCallback;
 var useEffect = React.useEffect;
 var useRef = React.useRef;
 
+/* ---- TrailSDK ---- */
+var trailSdk = null;
+try {
+  if (typeof TrailSDK === "function") {
+    trailSdk = TrailSDK({ gameId: 1, tenantSlug: "trail" });
+  }
+} catch (e) { /* SDK not available, game runs standalone */ }
 
 /* ---- Math ---- */
 function gcd(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) { var t = b; b = a % b; a = t; } return a; }
@@ -32,7 +43,7 @@ function isS1(f) { return f.n === 1 && f.d === 1; }
 function fracVal(f) { return f.n / f.d; }
 function prox1(f) { return Math.max(0, 1 - Math.abs(1 - fracVal(f))); }
 
-var FF = "'Fredoka', sans-serif";
+var FF = "'M PLUS Rounded 1c', 'Fredoka', sans-serif";
 
 function Frac(props) {
   var sz = props.size || 24, cl = props.color || "#fff", fw = props.bold === false ? 500 : 700;
@@ -159,7 +170,7 @@ var ST = {
 };
 
 var CSS = [
-  "@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap');",
+  "@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap');@import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&display=swap');",
   "@keyframes fadeIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}",
   "@keyframes popIn{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}",
   "@keyframes dropTarget{0%,100%{box-shadow:0 0 0 3px rgba(116,185,255,.6)}50%{box-shadow:0 0 0 7px rgba(116,185,255,.8)}}",
@@ -405,7 +416,8 @@ function LineConfirm(props) {
 }
 
 /* ======== MAIN ======== */
-function FractionFusion() {
+function FractionFusion(props) {
+  var trailPlayerName = props && props.playerName ? props.playerName : "";
   var _screen = useState("home"), screen = _screen[0], setScreen = _screen[1];
   var _diff = useState(null), diff = _diff[0], setDiff = _diff[1];
   var _cards = useState([]), cards = _cards[0], setCards = _cards[1];
@@ -618,6 +630,23 @@ function FractionFusion() {
     if (sc.total > highScore) setHighScore(sc.total);
     setResultAlt({ earned: totalEarned, firstBonus: fcb, stars: stars });
     setResult(true); setCMenu(null); setRegResult(null); setRegistered(false);
+    /* TrailSDK endSession & ALT popup */
+    try {
+      if (trailSdk && typeof trailSdk.endSession === "function") {
+        var sessionResult = trailSdk.endSession({ score: sc.total, correct: del.length, total: (DIFFICULTIES[diff] || DIFFICULTIES.normal).cardCount });
+        if (sessionResult && typeof sessionResult.then === "function") {
+          sessionResult.then(function(res) {
+            try {
+              var altCount = res && (res.alt !== undefined ? res.alt : res.alts !== undefined ? res.alts : null);
+              if (altCount !== null && trailSdk.showAltPopup) trailSdk.showAltPopup(altCount);
+            } catch (e2) { /* ignore */ }
+          }).catch(function() { /* ignore */ });
+        } else if (sessionResult) {
+          var altCount = sessionResult.alt !== undefined ? sessionResult.alt : sessionResult.alts !== undefined ? sessionResult.alts : null;
+          if (altCount !== null && trailSdk.showAltPopup) trailSdk.showAltPopup(altCount);
+        }
+      }
+    } catch (e) { /* ignore */ }
   }, [del, cards, diff, cleared, highScore]);
 
   /* Ranking registration */
@@ -648,6 +677,7 @@ function FractionFusion() {
     setDiff(d); setCards(makePuzzle(d)); setScreen("game"); setRules(false); setResult(false);
     setDel([]); setHist([]); setHMeta([]); setFormula(null); setSpUses(3);
     setCombo(0); setResultAlt(null); setAutoSimp(null); setRegResult(null); setRegistered(false);
+    try { if (trailSdk && typeof trailSdk.startSession === "function") trailSdk.startSession(); } catch (e) { /* ignore */ }
   }, []);
   var retry = useCallback(function() {
     if (!diff) return;
@@ -705,13 +735,19 @@ function FractionFusion() {
         <div style={{ animation: "fadeIn .5s ease-out", textAlign: "center", maxWidth: isTablet ? 500 : 380, width: "100%", marginTop: 30 }}>
           <div style={{ fontSize: isTablet ? 56 : 48, marginBottom: 8 }}>{"\ud83e\uddea"}</div>
           <div style={{ fontSize: isTablet ? 32 : 26, fontWeight: 700, fontFamily: FF, background: "linear-gradient(135deg,#FF6B6B,#FFEAA7,#4ECDC4)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", marginBottom: 6 }}>{"\u5206\u6570\u878d\u5408"}</div>
-          <div style={{ fontSize: isTablet ? 16 : 13, color: "rgba(255,255,255,.4)", marginBottom: 24 }}>{"\u30ab\u30fc\u30c9\u3092\u305f\u3057\u7b97\u3067\u5408\u4f53\u3055\u305b\u3066\u6574\u6570\u3092\u4f5c\u308d\u3046\uff01"}</div>
+          <div style={{ fontSize: isTablet ? 16 : 13, color: "rgba(255,255,255,.4)", marginBottom: trailPlayerName ? 12 : 24 }}>{"\u30ab\u30fc\u30c9\u3092\u305f\u3057\u7b97\u3067\u5408\u4f53\u3055\u305b\u3066\u6574\u6570\u3092\u4f5c\u308d\u3046\uff01"}</div>
+          {trailPlayerName && (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(26,115,232,.15)", border: "1.5px solid rgba(26,115,232,.4)", borderRadius: 20, padding: "6px 16px", marginBottom: 20, boxShadow: "0 2px 8px rgba(26,115,232,.15)" }}>
+              <span style={{ fontSize: 14 }}>{"\uD83D\uDC64"}</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#1a73e8", fontFamily: FF }}>{trailPlayerName}</span>
+            </div>
+          )}
           <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
             {["easy", "normal", "hard"].map(function(key) {
               var d = DIFFICULTIES[key];
               var done = cleared[key];
               return (
-                <button key={key} onClick={function() { startGame(key); }} style={{ background: "rgba(255,255,255,.04)", border: "2px solid " + d.color + "44", borderRadius: isTablet ? 20 : 16, padding: isTablet ? "20px 24px" : "16px 20px", cursor: "pointer", display: "flex", alignItems: "center", gap: isTablet ? 18 : 14, transition: "all .2s", position: "relative" }}>
+                <button key={key} onClick={function() { startGame(key); }} style={{ background: "rgba(255,255,255,.04)", border: "2px solid " + d.color + "44", borderRadius: isTablet ? 20 : 16, padding: isTablet ? "20px 24px" : "16px 20px", cursor: "pointer", display: "flex", alignItems: "center", gap: isTablet ? 18 : 14, transition: "all .2s", position: "relative", boxShadow: "0 4px 16px rgba(0,0,0,.2)" }}>
                   <div style={{ fontSize: isTablet ? 40 : 32 }}>{d.emoji}</div>
                   <div style={{ textAlign: "left", flex: 1 }}>
                     <div style={{ fontSize: isTablet ? 22 : 18, fontWeight: 700, color: d.color, fontFamily: FF }}>{d.label}</div>
@@ -723,10 +759,10 @@ function FractionFusion() {
             })}
           </div>
           {/* Ranking button */}
-          <button onClick={function() { setScreen("ranking"); }} style={{ width: "100%", padding: "14px", borderRadius: 16, border: "2px solid rgba(255,215,0,.2)", background: "rgba(255,215,0,.06)", color: "#FFD700", fontFamily: FF, fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          <button onClick={function() { setScreen("ranking"); }} style={{ width: "100%", padding: "14px", borderRadius: 16, border: "2px solid rgba(255,215,0,.2)", background: "rgba(255,215,0,.06)", color: "#FFD700", fontFamily: FF, fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 4px 16px rgba(0,0,0,.15)" }}>
             <span>{"\ud83c\udfc6"}</span><span>{"\u30e9\u30f3\u30ad\u30f3\u30b0"}</span>
           </button>
-          <div style={{ background: "rgba(255,255,255,.03)", borderRadius: 14, padding: "14px 16px", textAlign: "left", marginBottom: 24 }}>
+          <div style={{ background: "rgba(255,255,255,.03)", borderRadius: 14, padding: "14px 16px", textAlign: "left", marginBottom: 24, boxShadow: "0 2px 12px rgba(0,0,0,.15)" }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,.5)", marginBottom: 8 }}>{"\ud83c\udfae \u3042\u305d\u3073\u304b\u305f"}</div>
             {["\ud83d\udc46 \u30ab\u30fc\u30c9\u3092\u91cd\u306d\u308b \u2192 \u305f\u3057\u7b97\u3067\u5408\u4f53", "\ud83d\udc47 \u30bf\u30c3\u30d7 \u2192 \u7d04\u5206\u30fb\u901a\u5206", "\ud83d\udce6 \u6574\u6570\u3092\u4f5c\u3063\u305f\u3089\u7d0d\u54c1\u30dc\u30bf\u30f3\u3067\u7d0d\u54c1", "\u2b50 \u30b9\u30da\u30b7\u30e3\u30eb(2,3,5,7)\u3092\u30ab\u30fc\u30c9\u306b\u91cd\u306d\u3066\u00d7\u00f7\uff083\u56de\uff09", "\ud83e\ude99 \u5408\u4f53\u30fb\u7d0d\u54c1\u3067ALT\u7372\u5f97\uff01\u30b3\u30f3\u30dc\u3067\u30dc\u30fc\u30ca\u30b9\u2191"].map(function(t, i) {
               return <div key={i} style={{ fontSize: 11, color: "rgba(255,255,255,.4)", marginBottom: 2 }}>{t}</div>;
@@ -734,7 +770,7 @@ function FractionFusion() {
           </div>
 
           {/* LINE Report Section */}
-          <div style={{ background: "rgba(6,199,85,.06)", border: "1px solid rgba(6,199,85,.2)", borderRadius: 16, padding: "16px", textAlign: "center" }}>
+          <div style={{ background: "rgba(6,199,85,.06)", border: "1px solid rgba(6,199,85,.2)", borderRadius: 16, padding: "16px", textAlign: "center", boxShadow: "0 4px 16px rgba(0,0,0,.15)" }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#06C755", fontFamily: FF, marginBottom: 10 }}>{"\ud83d\udcb0 ALT\u3092TRAIL\u306b\u5831\u544a\u3059\u308b"}</div>
             <input
               value={lineName}
@@ -906,7 +942,130 @@ function FractionFusion() {
 }
 
 
-ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(FractionFusion));
+/* ---- App Wrapper with PIN Auth ---- */
+function App() {
+  var _auth = useState(false), authenticated = _auth[0], setAuthenticated = _auth[1];
+  var _player = useState(""), playerName = _player[0], setPlayerName = _player[1];
+  var _checking = useState(true), checking = _checking[0], setChecking = _checking[1];
+
+  useEffect(function() {
+    var params = new URLSearchParams(window.location.search);
+    var token = params.get("token");
+    if (token) {
+      /* Token auth - skip PIN */
+      try {
+        if (trailSdk && typeof trailSdk.verifyToken === "function") {
+          trailSdk.verifyToken(token).then(function() {
+            try {
+              var name = trailSdk.getPlayerName ? trailSdk.getPlayerName() : "";
+              setPlayerName(name || "");
+            } catch (e) { /* ignore */ }
+            setAuthenticated(true);
+            setChecking(false);
+          }).catch(function() {
+            setAuthenticated(true);
+            setChecking(false);
+          });
+        } else {
+          setAuthenticated(true);
+          setChecking(false);
+        }
+      } catch (e) {
+        setAuthenticated(true);
+        setChecking(false);
+      }
+    } else {
+      /* Show PIN screen */
+      setChecking(false);
+    }
+  }, []);
+
+  var onPinSuccess = useCallback(function() {
+    try {
+      if (trailSdk && typeof trailSdk.getPlayerName === "function") {
+        var name = trailSdk.getPlayerName();
+        setPlayerName(name || "");
+      }
+    } catch (e) { /* ignore */ }
+    setAuthenticated(true);
+  }, []);
+
+  if (checking) {
+    return React.createElement("div", {
+      style: { width: "100%", height: "100dvh", background: "#0a0a1a", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,.3)", fontFamily: FF, fontSize: 14 }
+    }, "読み込み中...");
+  }
+
+  if (!authenticated) {
+    return React.createElement(PinScreen, { onSuccess: onPinSuccess });
+  }
+
+  return React.createElement(FractionFusion, { playerName: playerName });
+}
+
+/* ---- PIN Screen ---- */
+function PinScreen(props) {
+  var containerRef = useRef(null);
+
+  useEffect(function() {
+    if (!containerRef.current) return;
+    try {
+      if (typeof TrailAuth === "function" || typeof TrailAuth === "object") {
+        var authMethod = typeof TrailAuth.mount === "function" ? TrailAuth : (typeof TrailAuth === "function" ? TrailAuth() : null);
+        if (authMethod && typeof authMethod.mount === "function") {
+          authMethod.mount(containerRef.current, {
+            gameId: 1,
+            tenantSlug: "trail",
+            onSuccess: function() { props.onSuccess(); }
+          });
+        } else if (typeof TrailAuth === "function") {
+          TrailAuth({
+            container: containerRef.current,
+            gameId: 1,
+            tenantSlug: "trail",
+            onSuccess: function() { props.onSuccess(); }
+          });
+        }
+      }
+    } catch (e) {
+      /* If TrailAuth fails, show fallback */
+    }
+  }, []);
+
+  return React.createElement("div", {
+    id: "pinScreen",
+    style: {
+      width: "100%", minHeight: "100dvh", background: "linear-gradient(150deg,#0a0a1a 0%,#141432 40%,#0d1b2a 100%)",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20,
+      fontFamily: FF
+    }
+  },
+    React.createElement("div", {
+      style: { textAlign: "center", marginBottom: 32 }
+    },
+      React.createElement("div", { style: { fontSize: 48, marginBottom: 8 } }, "\uD83E\uDDEA"),
+      React.createElement("div", {
+        style: {
+          fontSize: 26, fontWeight: 700, fontFamily: FF,
+          background: "linear-gradient(135deg,#FF6B6B,#FFEAA7,#4ECDC4)",
+          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", marginBottom: 8
+        }
+      }, "\u5206\u6570\u878D\u5408"),
+      React.createElement("div", {
+        style: { fontSize: 13, color: "rgba(255,255,255,.4)" }
+      }, "PIN\u3092\u5165\u529B\u3057\u3066\u30ED\u30B0\u30A4\u30F3")
+    ),
+    React.createElement("div", {
+      ref: containerRef,
+      style: {
+        width: "100%", maxWidth: 360, borderRadius: 12,
+        boxShadow: "0 8px 32px rgba(0,0,0,.3)"
+      }
+    })
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
 </body>
 </html>
