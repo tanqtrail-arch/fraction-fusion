@@ -29,7 +29,7 @@ var useRef = React.useRef;
 var trailSdk = null;
 try {
   if (typeof TrailSDK === "function") {
-    trailSdk = TrailSDK({ gameId: 1, tenantSlug: "trail" });
+    trailSdk = TrailSDK({ gameId: 4, tenantSlug: "trail" });
   }
 } catch (e) { /* SDK not available, game runs standalone */ }
 
@@ -1014,14 +1014,14 @@ function PinScreen(props) {
         var authMethod = typeof TrailAuth.mount === "function" ? TrailAuth : (typeof TrailAuth === "function" ? TrailAuth() : null);
         if (authMethod && typeof authMethod.mount === "function") {
           authMethod.mount(containerRef.current, {
-            gameId: 1,
+            gameId: 4,
             tenantSlug: "trail",
             onSuccess: function() { props.onSuccess(); }
           });
         } else if (typeof TrailAuth === "function") {
           TrailAuth({
             container: containerRef.current,
-            gameId: 1,
+            gameId: 4,
             tenantSlug: "trail",
             onSuccess: function() { props.onSuccess(); }
           });
