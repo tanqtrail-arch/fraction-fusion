@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>分数融合 - 保護者ダッシュボード</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&display=swap">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'M PLUS Rounded 1c', sans-serif; }
+  html, body, #root { width: 100%; min-height: 100vh; }
+  body { background: linear-gradient(150deg, #0a0a1a 0%, #141432 40%, #0d1b2a 100%); color: #fff; }
+</style>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+var useState = React.useState;
+var useEffect = React.useEffect;
+var FF = "'M PLUS Rounded 1c', sans-serif";
+
+var DIFF_MAP = {
+  easy: { label: "かんたん", emoji: "\ud83c\udf31", color: "#4ECDC4" },
+  normal: { label: "ふつう", emoji: "\u26a1", color: "#FFEAA7" },
+  hard: { label: "むずかしい", emoji: "\ud83d\udd25", color: "#FF6B6B" }
+};
+
+function ParentDashboard() {
+  var _s = useState(true), loading = _s[0], setLoading = _s[1];
+  var _e = useState(null), error = _e[0], setError = _e[1];
+  var _d = useState(null), student = _d[0], setStudent = _d[1];
+
+  useEffect(function() {
+    var params = new URLSearchParams(window.location.search);
+    var token = params.get("token");
+    if (!token) {
+      setError("トークンが見つかりません。ログインページからアクセスしてください。");
+      setLoading(false);
+      return;
+    }
+    fetch("/api/parent-tokens/verify?token=" + encodeURIComponent(token))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.valid) {
+          setStudent(data.student);
+        } else {
+          setError(data.error || "認証に失敗しました");
+        }
+        setLoading(false);
+      })
+      .catch(function() {
+        setError("サーバーに接続できません");
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) {
+    return (
+      <div style={{ width: "100%", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>{"\ud83e\uddea"}</div>
+          <div style={{ fontSize: 14, color: "rgba(255,255,255,.4)", fontFamily: FF }}>{"読み込み中..."}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ width: "100%", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+        <div style={{ textAlign: "center", maxWidth: 360 }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>{"\ud83d\udd12"}</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#FF6B6B", fontFamily: FF, marginBottom: 8 }}>{"アクセスエラー"}</div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,.5)", fontFamily: FF, marginBottom: 24 }}>{error}</div>
+          <a href="/" style={{ display: "inline-block", padding: "10px 24px", borderRadius: 12, background: "rgba(255,255,255,.08)", color: "#fff", fontFamily: FF, fontSize: 13, fontWeight: 600, textDecoration: "none" }}>{"ログインページへ"}</a>
+        </div>
+      </div>
+    );
+  }
+
+  return <Dashboard student={student} />;
+}
+
+function Dashboard(props) {
+  var s = props.student;
+  var now = new Date();
+  var currentMonth = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+  var currentAlt = 0;
+  var prevAlt = 0;
+  if (s.altHistory) {
+    var cur = s.altHistory.find(function(h) { return h.month === currentMonth; });
+    if (cur) currentAlt = cur.total;
+    var prevMonth = now.getMonth() === 0
+      ? (now.getFullYear() - 1) + "-12"
+      : now.getFullYear() + "-" + String(now.getMonth()).padStart(2, "0");
+    var prev = s.altHistory.find(function(h) { return h.month === prevMonth; });
+    if (prev) prevAlt = prev.total;
+  }
+  var altDiff = currentAlt - prevAlt;
+
+  return (
+    <div style={{ maxWidth: 480, margin: "0 auto", padding: "20px 16px 40px" }}>
+      {/* Header */}
+      <div style={{ textAlign: "center", marginBottom: 24 }}>
+        <div style={{ fontSize: 32, marginBottom: 4 }}>{"\ud83e\uddea"}</div>
+        <div style={{ fontSize: 18, fontWeight: 700, fontFamily: FF, background: "linear-gradient(135deg,#FF6B6B,#FFEAA7,#4ECDC4)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", marginBottom: 4 }}>{"分数融合"}</div>
+        <div style={{ fontSize: 11, color: "rgba(255,255,255,.3)", fontFamily: FF }}>{"保護者ダッシュボード"}</div>
+      </div>
+
+      {/* Student Info Card */}
+      <div style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 16, padding: "16px 20px", marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 48, height: 48, borderRadius: "50%", background: "linear-gradient(135deg,#667eea,#764ba2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{"\ud83d\udc64"}</div>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#fff", fontFamily: FF }}>{s.name}</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,.4)", fontFamily: FF }}>{s.className}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ALT Summary */}
+      <div style={{ background: "rgba(78,205,196,.06)", border: "1px solid rgba(78,205,196,.2)", borderRadius: 16, padding: "16px 20px", marginBottom: 16 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(78,205,196,.7)", fontFamily: FF, marginBottom: 10 }}>{"\ud83e\ude99 今月のALT"}</div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+          <span style={{ fontSize: 36, fontWeight: 800, color: "#4ECDC4", fontFamily: FF }}>{currentAlt}</span>
+          <span style={{ fontSize: 14, color: "rgba(78,205,196,.6)", fontFamily: FF }}>{"ALT"}</span>
+          {altDiff !== 0 && (
+            <span style={{ fontSize: 12, fontWeight: 600, color: altDiff > 0 ? "#4ECDC4" : "#FF6B6B", background: altDiff > 0 ? "rgba(78,205,196,.1)" : "rgba(255,107,107,.1)", borderRadius: 8, padding: "2px 8px", fontFamily: FF }}>
+              {(altDiff > 0 ? "+" : "") + altDiff + " 先月比"}
+            </span>
+          )}
+        </div>
+        {/* Monthly bars */}
+        {s.altHistory && s.altHistory.length > 0 && (
+          <div style={{ marginTop: 14 }}>
+            {s.altHistory.slice().reverse().map(function(h) {
+              var maxAlt = Math.max.apply(null, s.altHistory.map(function(x) { return x.total; }));
+              var pct = maxAlt > 0 ? Math.round(h.total / maxAlt * 100) : 0;
+              var isCurrent = h.month === currentMonth;
+              return (
+                <div key={h.month} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,.3)", fontFamily: FF, width: 60, flexShrink: 0 }}>{h.month}</span>
+                  <div style={{ flex: 1, height: 14, background: "rgba(255,255,255,.03)", borderRadius: 7, overflow: "hidden" }}>
+                    <div style={{ width: pct + "%", height: "100%", background: isCurrent ? "linear-gradient(90deg,#4ECDC4,#45B7D1)" : "rgba(78,205,196,.3)", borderRadius: 7, transition: "width .5s" }} />
+                  </div>
+                  <span style={{ fontSize: 11, color: isCurrent ? "#4ECDC4" : "rgba(255,255,255,.3)", fontWeight: isCurrent ? 700 : 400, fontFamily: FF, width: 36, textAlign: "right", flexShrink: 0 }}>{h.total}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Teacher Comments */}
+      <div style={{ background: "rgba(255,234,167,.04)", border: "1px solid rgba(255,234,167,.15)", borderRadius: 16, padding: "16px 20px", marginBottom: 16 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,234,167,.7)", fontFamily: FF, marginBottom: 10 }}>{"\ud83d\udcdd 先生からのコメント"}</div>
+        {(!s.teacherComments || s.teacherComments.length === 0) ? (
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,.3)", fontFamily: FF }}>{"まだコメントはありません"}</div>
+        ) : (
+          s.teacherComments.map(function(c, i) {
+            return (
+              <div key={i} style={{ background: "rgba(255,255,255,.03)", borderRadius: 10, padding: "10px 14px", marginBottom: i < s.teacherComments.length - 1 ? 8 : 0 }}>
+                <div style={{ fontSize: 10, color: "rgba(255,234,167,.5)", fontFamily: FF, marginBottom: 4 }}>{c.date}</div>
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,.7)", fontFamily: FF, lineHeight: 1.5 }}>{c.text}</div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Play History */}
+      <div style={{ background: "rgba(162,155,254,.04)", border: "1px solid rgba(162,155,254,.15)", borderRadius: 16, padding: "16px 20px", marginBottom: 16 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(162,155,254,.7)", fontFamily: FF, marginBottom: 10 }}>{"\ud83c\udfae ゲームプレイ履歴"}</div>
+        {(!s.playHistory || s.playHistory.length === 0) ? (
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,.3)", fontFamily: FF }}>{"まだプレイ履歴はありません"}</div>
+        ) : (
+          s.playHistory.map(function(p, i) {
+            var d = new Date(p.date);
+            var dateStr = (d.getMonth() + 1) + "/" + d.getDate() + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+            var df = DIFF_MAP[p.difficulty] || DIFF_MAP.normal;
+            var stars = "";
+            for (var s2 = 0; s2 < 3; s2++) stars += s2 < p.stars ? "\u2b50" : "\u2606";
+            return (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(255,255,255,.02)", borderRadius: 10, padding: "10px 12px", marginBottom: i < props.student.playHistory.length - 1 ? 6 : 0 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                    <span style={{ fontSize: 10, color: df.color, background: df.color + "22", borderRadius: 5, padding: "1px 6px", fontWeight: 600, fontFamily: FF }}>{df.emoji + " " + df.label}</span>
+                    <span style={{ fontSize: 10, color: "rgba(255,255,255,.25)", fontFamily: FF }}>{dateStr}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,.4)", fontFamily: FF }}>{stars}</div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#FFD700", fontFamily: FF }}>{p.score}</div>
+                  <div style={{ fontSize: 10, color: "rgba(78,205,196,.6)", fontFamily: FF }}>{"+"+p.altEarned+" ALT"}</div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Footer */}
+      <div style={{ textAlign: "center", marginTop: 24 }}>
+        <a href="/" style={{ fontSize: 12, color: "rgba(255,255,255,.3)", fontFamily: FF, textDecoration: "none" }}>{"← ログインページに戻る"}</a>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<ParentDashboard />);
+</script>
+</body>
+</html>
