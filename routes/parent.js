@@ -5,28 +5,39 @@ const { readData, writeData } = require('../lib/store');
 const router = express.Router();
 
 // POST /api/parent-login
-// Body: { studentName, pin }
-// Returns: { token, student: { name, className } }
+// Body: { tenant_slug, student_name, pin }
+// Returns: { token, url }
 router.post('/parent-login', function (req, res) {
-  var studentName = req.body.studentName;
+  var studentName = req.body.student_name;
   var pin = req.body.pin;
 
   if (!studentName || !pin) {
-    return res.status(400).json({ error: '名前とPINを入力してください' });
+    return res.status(400).json({ error: '生徒名とPINを入力してください' });
   }
 
   var data = readData();
   var student = data.students.find(function (s) {
-    return s.name === studentName && s.pin === pin;
+    return s.name === studentName;
   });
 
   if (!student) {
-    return res.status(401).json({ error: '名前またはPINが正しくありません' });
+    return res.status(401).json({ error: '生徒が見つかりません' });
+  }
+
+  // pin列がなければ初期値「0000」で追加
+  if (!student.pin) {
+    student.pin = '0000';
+    writeData(data);
+  }
+
+  if (student.pin !== pin) {
+    return res.status(401).json({ error: 'PINが違います' });
   }
 
   var token = uuidv4();
   data.parentTokens[token] = {
     studentId: student.id,
+    pin: student.pin,
     createdAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
   };
@@ -34,7 +45,7 @@ router.post('/parent-login', function (req, res) {
 
   return res.json({
     token: token,
-    student: { name: student.name, className: student.className }
+    url: '/parent.html?token=' + token
   });
 });
 
@@ -107,6 +118,7 @@ router.post('/parent-tokens', function (req, res) {
   var token = uuidv4();
   data.parentTokens[token] = {
     studentId: student.id,
+    pin: student.pin,
     createdAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
   };

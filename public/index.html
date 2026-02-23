@@ -764,10 +764,6 @@ function FractionFusion(props) {
           <button onClick={goHome} style={{ width: "100%", padding: "14px", borderRadius: 16, border: "2px solid rgba(78,205,196,.2)", background: "rgba(78,205,196,.06)", color: "#4ECDC4", fontFamily: FF, fontSize: 15, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 4px 16px rgba(0,0,0,.15)" }}>
             <span>{"\ud83c\udfe0"}</span><span>{"\u30db\u30fc\u30e0\u306b\u623b\u308b"}</span>
           </button>
-          {/* Parent login link */}
-          <div style={{ textAlign: "center", marginTop: 20 }}>
-            <button onClick={function() { if (props.onParentLogin) props.onParentLogin(); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,.3)", fontFamily: FF, fontSize: 12, cursor: "pointer", textDecoration: "underline", padding: "4px 8px" }}>{"\ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67 \u4fdd\u8b77\u8005\u306e\u65b9\u306f\u3053\u3061\u3089"}</button>
-          </div>
         </div>
       </div>
     );
@@ -926,88 +922,110 @@ function FractionFusion(props) {
 
 /* ---- App Wrapper ---- */
 function App() {
-  var _s = useState("game"), screen = _s[0], setScreen = _s[1];
+  var _lt = useState("student"), loginTab = _lt[0], setLoginTab = _lt[1];
   var _pName = useState(""), pName = _pName[0], setPName = _pName[1];
   var _pPin = useState(""), pPin = _pPin[0], setPPin = _pPin[1];
   var _pErr = useState(""), pErr = _pErr[0], setPErr = _pErr[1];
   var _pLoading = useState(false), pLoading = _pLoading[0], setPLoading = _pLoading[1];
 
   function handleParentLogin() {
-    if (!pName.trim() || !pPin.trim()) { setPErr("\u540d\u524d\u3068PIN\u3092\u5165\u529b\u3057\u3066\u304f\u3060\u3055\u3044"); return; }
+    if (!pName.trim() || !pPin.trim()) { setPErr("\u751f\u5f92\u540d\u3068PIN\u3092\u5165\u529b\u3057\u3066\u304f\u3060\u3055\u3044"); return; }
     setPLoading(true); setPErr("");
     fetch("/api/parent-login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ studentName: pName.trim(), pin: pPin.trim() })
+      body: JSON.stringify({ tenant_slug: "trail", student_name: pName.trim(), pin: pPin.trim() })
     })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.token) {
-        window.location.href = "/parent.html?token=" + data.token;
-      } else {
-        setPErr(data.error || "\u30ed\u30b0\u30a4\u30f3\u306b\u5931\u6557\u3057\u307e\u3057\u305f");
-        setPLoading(false);
-      }
+    .then(function(r) {
+      if (!r.ok) return r.json().then(function(d) { throw d; });
+      return r.json();
     })
-    .catch(function() {
-      setPErr("\u30b5\u30fc\u30d0\u30fc\u306b\u63a5\u7d9a\u3067\u304d\u307e\u305b\u3093");
+    .then(function(r) {
+      window.location.href = r.url;
+    })
+    .catch(function(err) {
+      setPErr(err && err.error ? err.error : "\u30b5\u30fc\u30d0\u30fc\u306b\u63a5\u7d9a\u3067\u304d\u307e\u305b\u3093");
       setPLoading(false);
     });
   }
 
-  /* ---- Parent Login Screen ---- */
-  if (screen === "parent") {
-    return React.createElement("div", {
-      style: {
-        width: "100%", minHeight: "100dvh", background: "linear-gradient(150deg,#0a0a1a 0%,#141432 40%,#0d1b2a 100%)",
-        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20,
-        fontFamily: FF
-      }
-    },
-      React.createElement("div", { style: { textAlign: "center", marginBottom: 32 } },
-        React.createElement("div", { style: { fontSize: 48, marginBottom: 8 } }, "\uD83E\uDDEA"),
-        React.createElement("div", {
-          style: { fontSize: 26, fontWeight: 700, fontFamily: FF, background: "linear-gradient(135deg,#FF6B6B,#FFEAA7,#4ECDC4)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", marginBottom: 8 }
-        }, "\u5206\u6570\u878d\u5408"),
-        React.createElement("div", { style: { fontSize: 13, color: "rgba(255,255,255,.4)" } }, "\u4fdd\u8b77\u8005\u30ed\u30b0\u30a4\u30f3")
-      ),
-      React.createElement("div", {
-        style: { width: "100%", maxWidth: 360, background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 16, padding: "24px 20px", boxShadow: "0 8px 32px rgba(0,0,0,.3)" }
-      },
-        React.createElement("div", { style: { marginBottom: 14 } },
-          React.createElement("label", { style: { fontSize: 12, color: "rgba(255,255,255,.4)", fontFamily: FF, display: "block", marginBottom: 4 } }, "\u304a\u5b50\u69d8\u306e\u540d\u524d"),
-          React.createElement("input", {
-            value: pName, onChange: function(e) { setPName(e.target.value); setPErr(""); },
-            placeholder: "\u4f8b: \u7530\u4e2d\u592a\u90ce",
-            style: { width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.06)", color: "#fff", fontFamily: FF, fontSize: 14, outline: "none" }
-          })
-        ),
-        React.createElement("div", { style: { marginBottom: 18 } },
-          React.createElement("label", { style: { fontSize: 12, color: "rgba(255,255,255,.4)", fontFamily: FF, display: "block", marginBottom: 4 } }, "PIN"),
-          React.createElement("input", {
-            type: "password", value: pPin,
-            onChange: function(e) { setPPin(e.target.value); setPErr(""); },
-            onKeyDown: function(e) { if (e.key === "Enter") handleParentLogin(); },
-            placeholder: "4\u6841\u306ePIN", maxLength: 4, inputMode: "numeric",
-            style: { width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.06)", color: "#fff", fontFamily: FF, fontSize: 14, outline: "none", letterSpacing: 4 }
-          })
-        ),
-        pErr && React.createElement("div", { style: { fontSize: 12, color: "#FF6B6B", fontFamily: FF, textAlign: "center", marginBottom: 12 } }, pErr),
-        React.createElement("button", {
-          onClick: handleParentLogin, disabled: pLoading,
-          style: { width: "100%", padding: "12px 0", borderRadius: 12, border: "none", background: pLoading ? "rgba(255,255,255,.05)" : "linear-gradient(135deg,#667eea,#764ba2)", color: pLoading ? "rgba(255,255,255,.3)" : "#fff", fontFamily: FF, fontSize: 14, fontWeight: 700, cursor: pLoading ? "default" : "pointer" }
-        }, pLoading ? "\u30ed\u30b0\u30a4\u30f3\u4e2d..." : "\u30ed\u30b0\u30a4\u30f3")
-      ),
-      React.createElement("div", { style: { marginTop: 20, textAlign: "center" } },
-        React.createElement("button", {
-          onClick: function() { setScreen("game"); setPErr(""); },
-          style: { background: "none", border: "none", color: "rgba(255,255,255,.35)", fontFamily: FF, fontSize: 12, cursor: "pointer", textDecoration: "underline", padding: "4px 8px" }
-        }, "\u2190 \u30b2\u30fc\u30e0\u306b\u623b\u308b")
-      )
-    );
+  /* If ?player= present, skip login and go straight to game */
+  if (TRAIL_PLAYER) {
+    return React.createElement(FractionFusion, { playerName: TRAIL_PLAYER });
   }
 
-  return React.createElement(FractionFusion, { playerName: TRAIL_PLAYER || "", onParentLogin: function() { setScreen("parent"); } });
+  /* ---- Login Screen with Student / Parent tabs ---- */
+  var tabStyle = function(active) {
+    return {
+      flex: 1, padding: "10px 0", border: "none", borderRadius: "10px 10px 0 0", fontFamily: FF, fontSize: 14, fontWeight: 700, cursor: "pointer",
+      background: active ? "rgba(255,255,255,.08)" : "transparent",
+      color: active ? "#fff" : "rgba(255,255,255,.25)",
+      transition: "all .2s"
+    };
+  };
+
+  return React.createElement("div", {
+    style: { width: "100%", minHeight: "100dvh", background: "linear-gradient(150deg,#0a0a1a 0%,#141432 40%,#0d1b2a 100%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: FF }
+  },
+    /* Header */
+    React.createElement("div", { style: { textAlign: "center", marginBottom: 28 } },
+      React.createElement("div", { style: { fontSize: 48, marginBottom: 8 } }, "\uD83E\uDDEA"),
+      React.createElement("div", {
+        style: { fontSize: 26, fontWeight: 700, fontFamily: FF, background: "linear-gradient(135deg,#FF6B6B,#FFEAA7,#4ECDC4)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", marginBottom: 4 }
+      }, "\u5206\u6570\u878d\u5408"),
+      React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,.3)" } }, "Fraction Fusion")
+    ),
+    /* Card */
+    React.createElement("div", {
+      style: { width: "100%", maxWidth: 380, background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 16, overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,.3)" }
+    },
+      /* Tab bar */
+      React.createElement("div", { style: { display: "flex", borderBottom: "1px solid rgba(255,255,255,.06)" } },
+        React.createElement("button", { onClick: function() { setLoginTab("student"); setPErr(""); }, style: tabStyle(loginTab === "student") }, "\uD83E\uDDD2 \u751f\u5f92"),
+        React.createElement("button", { onClick: function() { setLoginTab("parent"); setPErr(""); }, style: tabStyle(loginTab === "parent") }, "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67 \u4fdd\u8b77\u8005")
+      ),
+      /* Tab content */
+      React.createElement("div", { style: { padding: "24px 20px" } },
+        loginTab === "student"
+          ? /* ---- Student tab: just a play button ---- */
+            React.createElement(React.Fragment, null,
+              React.createElement("div", { style: { fontSize: 13, color: "rgba(255,255,255,.4)", fontFamily: FF, textAlign: "center", marginBottom: 18, lineHeight: 1.6 } },
+                "\u30ab\u30fc\u30c9\u3092\u305f\u3057\u7b97\u3067\u5408\u4f53\u3055\u305b\u3066", React.createElement("br"), "\u6574\u6570\u3092\u4f5c\u308d\u3046\uff01"
+              ),
+              React.createElement("button", {
+                onClick: function() { window.location.href = "/?player=guest"; },
+                style: { width: "100%", padding: "14px 0", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#4ECDC4,#45B7D1)", color: "#fff", fontFamily: FF, fontSize: 15, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 16px rgba(78,205,196,.3)" }
+              }, "\uD83C\uDFAE \u30B2\u30FC\u30E0\u3092\u306F\u3058\u3081\u308B")
+            )
+          : /* ---- Parent tab: name + PIN form ---- */
+            React.createElement(React.Fragment, null,
+              React.createElement("div", { style: { marginBottom: 14 } },
+                React.createElement("label", { style: { fontSize: 12, color: "rgba(255,255,255,.4)", fontFamily: FF, display: "block", marginBottom: 4 } }, "\u751f\u5f92\u540d"),
+                React.createElement("input", {
+                  value: pName, onChange: function(e) { setPName(e.target.value); setPErr(""); },
+                  placeholder: "\u4f8b: \u7530\u4e2d\u592a\u90ce",
+                  style: { width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.06)", color: "#fff", fontFamily: FF, fontSize: 14, outline: "none" }
+                })
+              ),
+              React.createElement("div", { style: { marginBottom: 18 } },
+                React.createElement("label", { style: { fontSize: 12, color: "rgba(255,255,255,.4)", fontFamily: FF, display: "block", marginBottom: 4 } }, "PIN\uFF084\u6841\uFF09"),
+                React.createElement("input", {
+                  type: "password", value: pPin,
+                  onChange: function(e) { var v = e.target.value.replace(/[^0-9]/g, ""); if (v.length <= 4) setPPin(v); setPErr(""); },
+                  onKeyDown: function(e) { if (e.key === "Enter") handleParentLogin(); },
+                  placeholder: "0000", maxLength: 4, inputMode: "numeric",
+                  style: { width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.06)", color: "#fff", fontFamily: FF, fontSize: 14, outline: "none", letterSpacing: 8, textAlign: "center" }
+                })
+              ),
+              pErr && React.createElement("div", { style: { fontSize: 12, color: "#FF6B6B", fontFamily: FF, textAlign: "center", marginBottom: 12 } }, pErr),
+              React.createElement("button", {
+                onClick: handleParentLogin, disabled: pLoading,
+                style: { width: "100%", padding: "12px 0", borderRadius: 12, border: "none", background: pLoading ? "rgba(255,255,255,.05)" : "linear-gradient(135deg,#667eea,#764ba2)", color: pLoading ? "rgba(255,255,255,.3)" : "#fff", fontFamily: FF, fontSize: 14, fontWeight: 700, cursor: pLoading ? "default" : "pointer" }
+              }, pLoading ? "\u30ed\u30b0\u30a4\u30f3\u4e2d..." : "\u4fdd\u8b77\u8005\u30ed\u30b0\u30a4\u30f3")
+            )
+      )
+    )
+  );
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
