@@ -26,16 +26,8 @@ var useRef = React.useRef;
 const TRAIL_API = 'https://trail-game-pro-3-2.onrender.com';
 const TRAIL_PLAYER = new URLSearchParams(location.search).get('player') || null;
 
-function calcAlt(score) {
-  if (score >= 1000) return 30;
-  if (score >= 500)  return 20;
-  if (score >= 100)  return 10;
-  return 5;
-}
-
-async function sendResultToTrail(score) {
+async function sendResultToTrail(score, alt) {
   if (!TRAIL_PLAYER) return 0;
-  const alt = calcAlt(score);
   try {
     await fetch(`${TRAIL_API}/api/external/game-result`, {
       method: 'POST',
@@ -644,7 +636,7 @@ function FractionFusion(props) {
     setResultAlt({ earned: totalEarned, firstBonus: fcb, stars: stars });
     setResult(true); setCMenu(null); setRegResult(null); setRegistered(false);
     /* TRAIL GP3: send result */
-    sendResultToTrail(sc.total).then(function(trailAlt) {
+    sendResultToTrail(sc.total, totalEarned).then(function(trailAlt) {
       if (TRAIL_PLAYER && trailAlt > 0) {
         setResultAlt(function(prev) { return prev ? Object.assign({}, prev, { trailAlt: trailAlt }) : prev; });
       }
