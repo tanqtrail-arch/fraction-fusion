@@ -4,15 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>分数融合 - Fraction Fusion</title>
-<link rel="stylesheet" href="https://trail-game-pro.onrender.com/sdk/trail-auth.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&display=swap">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'M PLUS Rounded 1c', 'Fredoka', sans-serif; }
   html, body, #root { width: 100%; height: 100dvh; overflow: hidden; }
   body { background: #0a0a1a; }
 </style>
-<script src="https://trail-game-pro.onrender.com/sdk/trail-sdk.js"></script>
-<script src="https://trail-game-pro.onrender.com/sdk/trail-auth.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js"></script>
@@ -25,13 +22,43 @@ var useCallback = React.useCallback;
 var useEffect = React.useEffect;
 var useRef = React.useRef;
 
-/* ---- TrailSDK ---- */
-var trailSdk = null;
-try {
-  if (typeof TrailSDK === "function") {
-    trailSdk = TrailSDK({ gameId: 5, tenantSlug: "trail" });
+// ─── TRAIL GP3 連携 ───
+const TRAIL_API = 'https://trail-game-pro-3-2.onrender.com';
+const TRAIL_PLAYER = new URLSearchParams(location.search).get('player') || null;
+
+function calcAlt(score) {
+  if (score >= 1000) return 30;
+  if (score >= 500)  return 20;
+  if (score >= 100)  return 10;
+  return 5;
+}
+
+async function sendResultToTrail(score) {
+  if (!TRAIL_PLAYER) return 0;
+  const alt = calcAlt(score);
+  try {
+    await fetch(`${TRAIL_API}/api/external/game-result`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        player: TRAIL_PLAYER,
+        game_id: 'fraction-fusion',
+        game_name: '分数融合',
+        score: score,
+        alt: alt
+      })
+    });
+  } catch (e) {
+    console.error('ALT送信失敗:', e);
   }
-} catch (e) { /* SDK not available, game runs standalone */ }
+  return alt;
+}
+
+function goHome() {
+  window.location.href = TRAIL_PLAYER
+    ? 'https://trail-game-pro-3-2.onrender.com'
+    : location.href.split('?')[0];
+}
 
 /* ---- Math ---- */
 function gcd(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) { var t = b; b = a % b; a = t; } return a; }
@@ -337,6 +364,7 @@ function RankingScreen(props) {
 function ResultScr(props) {
   var del = props.del, cards = props.cards, onRetry = props.onRetry, onHome = props.onHome, diff = props.diff;
   var earned = props.earned, firstBonus = props.firstBonus, totalAlt = props.totalAlt, stars = props.stars;
+  var trailAlt = props.trailAlt;
   var onRegister = props.onRegister, regResult = props.regResult, regLoading = props.regLoading, savedName = props.savedName;
   var sc = calcSc(del, cards, diff);
   var rank = getRank(sc.total);
@@ -369,6 +397,7 @@ function ResultScr(props) {
             <div style={{ fontSize: 32, fontWeight: 700, color: "#4ECDC4", fontFamily: FF, textShadow: "0 2px 16px rgba(78,205,196,.5)" }}>{"+" + earned + " ALT"}</div>
             {firstBonus > 0 && <div style={{ marginTop: 4, fontSize: 12, fontWeight: 700, color: "#FFEAA7", fontFamily: FF }}>{"\ud83c\udf89 \u521d\u30af\u30ea\u30a2 +" + firstBonus}</div>}
             <div style={{ fontSize: 11, color: "rgba(255,255,255,.25)", marginTop: 4 }}>{"\ud83e\ude99 \u5408\u8a08: " + totalAlt + " ALT"}</div>
+            {TRAIL_PLAYER && trailAlt > 0 && <div style={{ marginTop: 6, fontSize: 13, fontWeight: 700, color: "#FFEAA7", fontFamily: FF }}>{"\ud83e\ude99 " + trailAlt + " ALT \u3092\u7372\u5f97\uff01"}</div>}
           </div>
         )}
         {!showAlt && <div style={{ height: 60, marginBottom: 10 }} />}
@@ -389,26 +418,12 @@ function ResultScr(props) {
             {regResult.alltimeRank > 0 && <div style={{ fontSize: 11, color: "#74B9FF", marginTop: 2 }}>{"\u265e \u6c38\u4e45 " + regResult.alltimeRank + "\u4f4d"}</div>}
           </div>
         )}
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={onHome} style={{ flex: 1, background: "rgba(255,255,255,.06)", border: "none", borderRadius: 14, padding: "10px 0", color: "rgba(255,255,255,.5)", fontSize: 13, fontWeight: 700, fontFamily: FF, cursor: "pointer" }}>{"\u2190 \u30db\u30fc\u30e0"}</button>
-          <button onClick={onRetry} style={{ flex: 1, background: "linear-gradient(135deg,#667eea,#764ba2)", border: "none", borderRadius: 14, padding: "10px 0", color: "#fff", fontSize: 13, fontWeight: 700, fontFamily: FF, cursor: "pointer" }}>{"\u21bb \u518d\u6311\u6226"}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ---- LINE Confirm Dialog ---- */
-function LineConfirm(props) {
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 950, background: "rgba(0,0,0,.6)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div style={{ background: "linear-gradient(145deg,#1a1a2e,#16213e)", borderRadius: 20, padding: "24px 20px", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,.6)", border: "1px solid rgba(255,255,255,.08)", animation: "popIn .25s ease-out", maxWidth: 320, width: "100%" }}>
-        <div style={{ fontSize: 28, marginBottom: 8 }}>{"\u26a0\ufe0f"}</div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", fontFamily: FF, marginBottom: 6 }}>{props.alt + "ALT\u3092\u5831\u544a\u3057\u3066\u30ea\u30bb\u30c3\u30c8\u3057\u307e\u3059"}</div>
-        <div style={{ fontSize: 11, color: "rgba(255,255,255,.35)", marginBottom: 16 }}>{"\u9001\u4fe1\u5f8c\u3001ALT\u306f0\u306b\u623b\u308a\u307e\u3059"}</div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={props.onCancel} style={{ flex: 1, padding: "12px 0", borderRadius: 14, border: "none", background: "rgba(255,255,255,.06)", color: "rgba(255,255,255,.5)", fontFamily: FF, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{"\u3084\u3081\u308b"}</button>
-          <button onClick={props.onSend} style={{ flex: 1, padding: "12px 0", borderRadius: 14, border: "none", background: "linear-gradient(135deg,#06C755,#04a849)", color: "#fff", fontFamily: FF, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{"OK\uff01\u9001\u308b"}</button>
+        <div style={{ display: "flex", gap: 8, flexDirection: "column" }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={onHome} style={{ flex: 1, background: "rgba(255,255,255,.06)", border: "none", borderRadius: 14, padding: "10px 0", color: "rgba(255,255,255,.5)", fontSize: 13, fontWeight: 700, fontFamily: FF, cursor: "pointer" }}>{"\u2190 \u30db\u30fc\u30e0"}</button>
+            <button onClick={onRetry} style={{ flex: 1, background: "linear-gradient(135deg,#667eea,#764ba2)", border: "none", borderRadius: 14, padding: "10px 0", color: "#fff", fontSize: 13, fontWeight: 700, fontFamily: FF, cursor: "pointer" }}>{"\u21bb \u518d\u6311\u6226"}</button>
+          </div>
+          <button onClick={goHome} style={{ width: "100%", background: "rgba(78,205,196,.1)", border: "1px solid rgba(78,205,196,.3)", borderRadius: 14, padding: "10px 0", color: "#4ECDC4", fontSize: 13, fontWeight: 700, fontFamily: FF, cursor: "pointer" }}>{"\ud83c\udfe0 \u30db\u30fc\u30e0\u306b\u623b\u308b"}</button>
         </div>
       </div>
     </div>
@@ -443,8 +458,6 @@ function FractionFusion(props) {
   var _combo = useState(0), combo = _combo[0], setCombo = _combo[1];
   var _cleared = useState({}), cleared = _cleared[0], setCleared = _cleared[1];
   var _resultAlt = useState(null), resultAlt = _resultAlt[0], setResultAlt = _resultAlt[1];
-  var _lineName = useState(""), lineName = _lineName[0], setLineName = _lineName[1];
-  var _lineConfirm = useState(false), lineConfirm = _lineConfirm[0], setLineConfirm = _lineConfirm[1];
   var _highScore = useState(0), highScore = _highScore[0], setHighScore = _highScore[1];
   var _autoSimp = useState(null), autoSimp = _autoSimp[0], setAutoSimp = _autoSimp[1];
   var _savedName = useState(""), savedName = _savedName[0], setSavedName = _savedName[1];
@@ -630,23 +643,12 @@ function FractionFusion(props) {
     if (sc.total > highScore) setHighScore(sc.total);
     setResultAlt({ earned: totalEarned, firstBonus: fcb, stars: stars });
     setResult(true); setCMenu(null); setRegResult(null); setRegistered(false);
-    /* TrailSDK endSession & ALT popup */
-    try {
-      if (trailSdk && typeof trailSdk.endSession === "function") {
-        var sessionResult = trailSdk.endSession({ score: sc.total, correct: del.length, total: (DIFFICULTIES[diff] || DIFFICULTIES.normal).cardCount });
-        if (sessionResult && typeof sessionResult.then === "function") {
-          sessionResult.then(function(res) {
-            try {
-              var altCount = res && (res.alt !== undefined ? res.alt : res.alts !== undefined ? res.alts : null);
-              if (altCount !== null && trailSdk.showAltPopup) trailSdk.showAltPopup(altCount);
-            } catch (e2) { /* ignore */ }
-          }).catch(function() { /* ignore */ });
-        } else if (sessionResult) {
-          var altCount = sessionResult.alt !== undefined ? sessionResult.alt : sessionResult.alts !== undefined ? sessionResult.alts : null;
-          if (altCount !== null && trailSdk.showAltPopup) trailSdk.showAltPopup(altCount);
-        }
+    /* TRAIL GP3: send result */
+    sendResultToTrail(sc.total).then(function(trailAlt) {
+      if (TRAIL_PLAYER && trailAlt > 0) {
+        setResultAlt(function(prev) { return prev ? Object.assign({}, prev, { trailAlt: trailAlt }) : prev; });
       }
-    } catch (e) { /* ignore */ }
+    });
   }, [del, cards, diff, cleared, highScore]);
 
   /* Ranking registration */
@@ -677,7 +679,6 @@ function FractionFusion(props) {
     setDiff(d); setCards(makePuzzle(d)); setScreen("game"); setRules(false); setResult(false);
     setDel([]); setHist([]); setHMeta([]); setFormula(null); setSpUses(3);
     setCombo(0); setResultAlt(null); setAutoSimp(null); setRegResult(null); setRegistered(false);
-    try { if (trailSdk && typeof trailSdk.startSession === "function") trailSdk.startSession(); } catch (e) { /* ignore */ }
   }, []);
   var retry = useCallback(function() {
     if (!diff) return;
@@ -689,15 +690,6 @@ function FractionFusion(props) {
     setHist([]); setHMeta([]); setFormula(null); setSpUses(3);
     setCombo(0); setResultAlt(null); setAutoSimp(null);
   }, []);
-
-  /* LINE report */
-  var sendLine = useCallback(function() {
-    var msg = "\u3010\u5206\u6570\u878d\u5408 ALT\u5831\u544a\u3011\n\u540d\u524d: " + lineName + "\n\ud83d\udcb0 " + alt + "ALT\n\u30cf\u30a4\u30b9\u30b3\u30a2: " + highScore + "\u70b9";
-    var url = "https://line.me/R/oaMessage/@trail_official/?" + encodeURIComponent(msg);
-    try { window.open(url, "_blank"); } catch (e) { /* ignore */ }
-    setAlt(0); setHighScore(0); setCleared({});
-    setLineConfirm(false);
-  }, [lineName, alt, highScore]);
 
   useEffect(function() {
     function h(e) { if (e.key === "Escape") { setCMenu(null); setSpOp(null); } }
@@ -714,7 +706,6 @@ function FractionFusion(props) {
   var finishActive = del.length > 0;
   var hasOnes = cards.some(function(c) { return c.d === 1; });
   var oneCount = cards.filter(function(c) { return c.d === 1; }).length;
-  var lineValid = lineName.trim().length > 0 && alt > 0;
 
   /* ======== RANKING SCREEN ======== */
   if (screen === "ranking") {
@@ -769,24 +760,11 @@ function FractionFusion(props) {
             })}
           </div>
 
-          {/* LINE Report Section */}
-          <div style={{ background: "rgba(6,199,85,.06)", border: "1px solid rgba(6,199,85,.2)", borderRadius: 16, padding: "16px", textAlign: "center", boxShadow: "0 4px 16px rgba(0,0,0,.15)" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#06C755", fontFamily: FF, marginBottom: 10 }}>{"\ud83d\udcb0 ALT\u3092TRAIL\u306b\u5831\u544a\u3059\u308b"}</div>
-            <input
-              value={lineName}
-              onChange={function(e) { setLineName(e.target.value); }}
-              placeholder={"\u540d\u524d\u3092\u5165\u529b"}
-              style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.05)", color: "#fff", fontFamily: FF, fontSize: 14, marginBottom: 10, outline: "none" }}
-            />
-            <button
-              onClick={function() { if (lineValid) setLineConfirm(true); }}
-              disabled={!lineValid}
-              style={{ width: "100%", padding: "12px 0", borderRadius: 12, border: "none", background: lineValid ? "linear-gradient(135deg,#06C755,#04a849)" : "rgba(255,255,255,.05)", color: lineValid ? "#fff" : "rgba(255,255,255,.2)", fontFamily: FF, fontSize: 14, fontWeight: 700, cursor: lineValid ? "pointer" : "default", opacity: lineValid ? 1 : 0.5 }}
-            >{"\ud83d\udcac LINE\u3067\u5831\u544a\u3059\u308b"}</button>
-            {alt === 0 && <div style={{ fontSize: 10, color: "rgba(255,255,255,.2)", marginTop: 6 }}>{"\u203b \u30b2\u30fc\u30e0\u3067ALT\u3092\u7372\u5f97\u3057\u3066\u304b\u3089\u5831\u544a\u3067\u304d\u307e\u3059"}</div>}
-          </div>
+          {/* Home button */}
+          <button onClick={goHome} style={{ width: "100%", padding: "14px", borderRadius: 16, border: "2px solid rgba(78,205,196,.2)", background: "rgba(78,205,196,.06)", color: "#4ECDC4", fontFamily: FF, fontSize: 15, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 4px 16px rgba(0,0,0,.15)" }}>
+            <span>{"\ud83c\udfe0"}</span><span>{"\u30db\u30fc\u30e0\u306b\u623b\u308b"}</span>
+          </button>
         </div>
-        {lineConfirm && <LineConfirm alt={alt} onCancel={function() { setLineConfirm(false); }} onSend={sendLine} />}
       </div>
     );
   }
@@ -936,133 +914,15 @@ function FractionFusion(props) {
           </div>
         </div>
       )}
-      {result && resultAlt && <ResultScr del={del} cards={cards} onRetry={retry} onHome={backToMenu} diff={diff} earned={resultAlt.earned} firstBonus={resultAlt.firstBonus} totalAlt={alt} stars={resultAlt.stars} onRegister={registerRanking} regResult={regResult} regLoading={regLoading} savedName={savedName} />}
+      {result && resultAlt && <ResultScr del={del} cards={cards} onRetry={retry} onHome={backToMenu} diff={diff} earned={resultAlt.earned} firstBonus={resultAlt.firstBonus} totalAlt={alt} stars={resultAlt.stars} trailAlt={resultAlt.trailAlt || 0} onRegister={registerRanking} regResult={regResult} regLoading={regLoading} savedName={savedName} />}
     </div>
   );
 }
 
 
-/* ---- App Wrapper with PIN Auth ---- */
+/* ---- App Wrapper ---- */
 function App() {
-  var _auth = useState(false), authenticated = _auth[0], setAuthenticated = _auth[1];
-  var _player = useState(""), playerName = _player[0], setPlayerName = _player[1];
-  var _checking = useState(true), checking = _checking[0], setChecking = _checking[1];
-
-  useEffect(function() {
-    var params = new URLSearchParams(window.location.search);
-    var token = params.get("token");
-    if (token) {
-      /* Token auth - skip PIN */
-      try {
-        if (trailSdk && typeof trailSdk.verifyToken === "function") {
-          trailSdk.verifyToken(token).then(function() {
-            try {
-              var name = trailSdk.getPlayerName ? trailSdk.getPlayerName() : "";
-              setPlayerName(name || "");
-            } catch (e) { /* ignore */ }
-            setAuthenticated(true);
-            setChecking(false);
-          }).catch(function() {
-            setAuthenticated(true);
-            setChecking(false);
-          });
-        } else {
-          setAuthenticated(true);
-          setChecking(false);
-        }
-      } catch (e) {
-        setAuthenticated(true);
-        setChecking(false);
-      }
-    } else {
-      /* Show PIN screen */
-      setChecking(false);
-    }
-  }, []);
-
-  var onPinSuccess = useCallback(function() {
-    try {
-      if (trailSdk && typeof trailSdk.getPlayerName === "function") {
-        var name = trailSdk.getPlayerName();
-        setPlayerName(name || "");
-      }
-    } catch (e) { /* ignore */ }
-    setAuthenticated(true);
-  }, []);
-
-  if (checking) {
-    return React.createElement("div", {
-      style: { width: "100%", height: "100dvh", background: "#0a0a1a", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,.3)", fontFamily: FF, fontSize: 14 }
-    }, "読み込み中...");
-  }
-
-  if (!authenticated) {
-    return React.createElement(PinScreen, { onSuccess: onPinSuccess });
-  }
-
-  return React.createElement(FractionFusion, { playerName: playerName });
-}
-
-/* ---- PIN Screen ---- */
-function PinScreen(props) {
-  var containerRef = useRef(null);
-
-  useEffect(function() {
-    if (!containerRef.current) return;
-    try {
-      if (typeof TrailAuth === "function" || typeof TrailAuth === "object") {
-        var authMethod = typeof TrailAuth.mount === "function" ? TrailAuth : (typeof TrailAuth === "function" ? TrailAuth() : null);
-        if (authMethod && typeof authMethod.mount === "function") {
-          authMethod.mount(containerRef.current, {
-            gameId: 5,
-            tenantSlug: "trail",
-            onSuccess: function() { props.onSuccess(); }
-          });
-        } else if (typeof TrailAuth === "function") {
-          TrailAuth({
-            container: containerRef.current,
-            gameId: 5,
-            tenantSlug: "trail",
-            onSuccess: function() { props.onSuccess(); }
-          });
-        }
-      }
-    } catch (e) {
-      /* If TrailAuth fails, show fallback */
-    }
-  }, []);
-
-  return React.createElement("div", {
-    id: "pinScreen",
-    style: {
-      width: "100%", minHeight: "100dvh", background: "linear-gradient(150deg,#0a0a1a 0%,#141432 40%,#0d1b2a 100%)",
-      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20,
-      fontFamily: FF
-    }
-  },
-    React.createElement("div", {
-      style: { textAlign: "center", marginBottom: 32 }
-    },
-      React.createElement("div", { style: { fontSize: 48, marginBottom: 8 } }, "\uD83E\uDDEA"),
-      React.createElement("div", {
-        style: {
-          fontSize: 26, fontWeight: 700, fontFamily: FF,
-          background: "linear-gradient(135deg,#FF6B6B,#FFEAA7,#4ECDC4)",
-          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", marginBottom: 8
-        }
-      }, "\u5206\u6570\u878D\u5408"),
-      React.createElement("div", {
-        style: { fontSize: 13, color: "rgba(255,255,255,.4)" }
-      }, "PIN\u3092\u5165\u529B\u3057\u3066\u30ED\u30B0\u30A4\u30F3")
-    ),
-    React.createElement("div", {
-      ref: containerRef,
-      style: {
-        width: "100%", maxWidth: 360, borderRadius: 12,
-        boxShadow: "0 8px 32px rgba(0,0,0,.3)"
-      }
-    })
-  );
+  return React.createElement(FractionFusion, { playerName: TRAIL_PLAYER || "" });
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
